@@ -1,0 +1,34 @@
+# Example dashboard view — paste into a new dashboard or add as a view
+
+title: Climate
+path: climate
+icon: mdi:thermometer
+cards:
+  - type: custom:climate-command-center
+    title: Climate Command Center
+    auto_discover: true
+    show_weather: true
+    show_room_sensors: true
+    group_by_floor: true
+    floors:
+      - name: Main Floor
+        zones:
+          - Laundry
+          - Living Room
+          - Main Area
+          - Redmond Thermostat
+        room_sensors:
+          - Family Room
+          - Kitchen
+          - Hallway
+          - Stairs
+          - Entryway
+          - Primary Bath
+          - Primary Bedroom
+      - name: Upper Floor
+        zones:
+          - Main Office
+        room_sensors:
+          - Hunters
+          - Sydney
+          - Upstair Office

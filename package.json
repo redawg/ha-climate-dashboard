@@ -1,0 +1,26 @@
+{
+  "name": "lovelace-climate-command-center",
+  "version": "0.2.0",
+  "type": "module",
+  "description": "Unified temperature dashboard for thermostats, heated floors, and weather stations",
+  "main": "dist/climate-command-center.js",
+  "scripts": {
+    "build": "rollup -c",
+    "watch": "rollup -c --watch"
+  },
+  "keywords": ["home-assistant", "lovelace", "climate", "hacs"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.3.0",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^12.1.2",
+    "rollup": "^4.28.1",
+    "tslib": "^2.8.1",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "custom-card-helpers": "^1.9.0",
+    "lit": "^3.2.1"
+  }
+}
