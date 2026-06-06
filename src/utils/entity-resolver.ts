@@ -208,21 +208,22 @@ export function discoverRoomSensors(
 ): RoomSensor[] {
   if (config.show_room_sensors === false) return [];
   if (config.room_sensors?.length) {
-    return config.room_sensors
-      .map((entityId) => {
-        const entity = getEntity(hass, entityId);
-        if (!entity) return null;
-        const floors = config.floors ?? DEFAULT_FLOORS;
-        const name = dedupeFriendlyName(friendlyName(entity).replace(/\s+temperature$/i, ''));
-        return {
-          name,
-          entity_id: entityId,
-          area: entityArea(hass, entityId),
-          floor: inferFloor(name, entityArea(hass, entityId), floors),
-          temperature: parseNumber(entity),
-        };
-      })
-      .filter((s): s is RoomSensor => s != null);
+    const manual: RoomSensor[] = [];
+    for (const entityId of config.room_sensors) {
+      const entity = getEntity(hass, entityId);
+      if (!entity) continue;
+      const floors = config.floors ?? DEFAULT_FLOORS;
+      const area = entityArea(hass, entityId);
+      const name = dedupeFriendlyName(friendlyName(entity).replace(/\s+temperature$/i, ''));
+      manual.push({
+        name,
+        entity_id: entityId,
+        area,
+        floor: inferFloor(name, area, floors),
+        temperature: parseNumber(entity),
+      });
+    }
+    return manual;
   }
 
   const usedIds = new Set<string>();

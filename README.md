@@ -15,6 +15,9 @@ A Home Assistant Lovelace custom card that puts all your temperature controls an
 ## Installation (HACS)
 
 1. Add this repo as a [custom HACS repository](https://hacs.xyz/docs/faq/custom_repositories/) (category: **Dashboard**)
+
+   Repository URL: `https://github.com/redawg/lovelace-climate-command-center`
+
 2. Install **Climate Command Center**
 3. Add the resource (if not auto-added):
 
