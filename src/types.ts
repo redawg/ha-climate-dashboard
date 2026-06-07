@@ -2,6 +2,8 @@ export interface ZoneConfig {
   name: string;
   climate_entity: string;
   floor?: string;
+  area?: string;
+  area_id?: string;
   floor_sensor?: string;
   room_sensor?: string;
   humidity_sensor?: string;
@@ -13,6 +15,12 @@ export interface FloorConfig {
   room_sensors?: string[];
 }
 
+export interface SensorAssignment {
+  entity_id: string;
+  zone?: string;
+  hidden?: boolean;
+}
+
 export interface ClimateCommandCenterConfig {
   type: 'custom:climate-command-center';
   title?: string;
@@ -20,6 +28,7 @@ export interface ClimateCommandCenterConfig {
   show_weather?: boolean;
   show_room_sensors?: boolean;
   group_by_floor?: boolean;
+  allow_sensor_reassign?: boolean;
   weather_entity?: string;
   weather_temperature?: string;
   weather_humidity?: string;
@@ -28,7 +37,23 @@ export interface ClimateCommandCenterConfig {
   zones?: ZoneConfig[];
   floors?: FloorConfig[];
   room_sensors?: string[];
+  /** entity_id -> climate_entity_id */
+  sensor_map?: Record<string, string>;
+  /** entity_id list to hide completely */
   exclude_entities?: string[];
+  /** entity_id -> height in feet from floor */
+  sensor_heights?: Record<string, number>;
+  /** climate_entity_id -> thermostat sensor height in feet */
+  zone_heights?: Record<string, number>;
+  /** climate_entity_id -> floor section name */
+  zone_floors?: Record<string, string>;
+  /** HA area_id or area name -> floor section name */
+  area_floor_map?: Record<string, string>;
+  /** target height for interpolated average (feet), default 5 */
+  reference_height_ft?: number;
+  /** legacy / alias for exclude_entities in editor */
+  sensor_assignments?: SensorAssignment[];
+  other_sensor_patterns?: string[];
 }
 
 export interface ZoneSensors {
@@ -37,26 +62,38 @@ export interface ZoneSensors {
   humidity?: number;
 }
 
-export interface ClimateZone {
-  name: string;
-  climate_entity: string;
-  floor?: string;
-  kind: 'floor_heat' | 'thermostat';
-  sensors: ZoneSensors;
-}
-
-export interface RoomSensor {
+export interface AreaSensor {
   name: string;
   entity_id: string;
   area?: string;
+  area_id?: string;
+  value?: number;
+  unit?: string;
+  kind: 'room' | 'other';
+  height_ft?: number;
+}
+
+export interface ClimateZone {
+  name: string;
+  climate_entity: string;
+  area?: string;
+  area_id?: string;
   floor?: string;
-  temperature?: number;
+  kind: 'floor_heat' | 'thermostat';
+  sensors: ZoneSensors;
+  roomSensors: AreaSensor[];
+  otherSensors: AreaSensor[];
+  linked_sensor_ids?: {
+    floor?: string;
+    room?: string;
+    humidity?: string;
+  };
 }
 
 export interface FloorSection {
   name: string;
   zones: ClimateZone[];
-  roomSensors: RoomSensor[];
+  unassignedSensors: AreaSensor[];
 }
 
 export interface WeatherData {
@@ -71,4 +108,24 @@ export interface HassEntity {
   entity_id: string;
   state: string;
   attributes: Record<string, unknown>;
+}
+
+export interface AssignableSensor {
+  entity_id: string;
+  name: string;
+  area?: string;
+  area_id?: string;
+  value?: number;
+  unit?: string;
+  kind: 'room' | 'other';
+  assigned_zone?: string;
+  auto_zone?: string;
+  auto_zone_name?: string;
+  hidden: boolean;
+  height_ft?: number;
+}
+
+export interface HaAreaOption {
+  area_id: string;
+  name: string;
 }

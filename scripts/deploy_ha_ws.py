@@ -6,7 +6,6 @@ import asyncio
 import json
 import os
 import sys
-from pathlib import Path
 
 try:
     import websockets
@@ -24,7 +23,7 @@ DASHBOARD_URL_PATH = os.environ.get("HA_DASHBOARD_PATH", "climate-dashboard")
 DASHBOARD_VIEW = "climate"
 RESOURCE_URL = os.environ.get(
     "HA_CARD_URL",
-    "/hacsfiles/climate-command-center/climate-command-center.js",
+    "http://172.16.1.32:8765/climate-command-center.js",
 )
 
 CARD_CONFIG = {
@@ -34,6 +33,28 @@ CARD_CONFIG = {
     "show_weather": True,
     "show_room_sensors": True,
     "group_by_floor": True,
+    "allow_sensor_reassign": True,
+    "reference_height_ft": 5,
+    "floors": [
+        {
+            "name": "Main Floor",
+            "zones": ["Laundry", "Living Room", "Main Area", "Main Office", "Redmond Thermostat"],
+            "room_sensors": [
+                "Family Room",
+                "Kitchen",
+                "Hallway",
+                "Stairs",
+                "Entryway",
+                "Primary Bath",
+                "Primary Bedroom",
+            ],
+        },
+        {
+            "name": "Upper Floor",
+            "zones": [],
+            "room_sensors": ["Hunters", "Sydney", "Upstair Office", "Upstairs Office"],
+        },
+    ],
 }
 
 
@@ -85,7 +106,7 @@ async def main() -> int:
 
         resources = await ws_call(ws, msg_id, "lovelace/resources/list")
         msg_id += 1
-        resource = next((r for r in resources if RESOURCE_URL in (r.get("url") or "")), None)
+        resource = next((r for r in resources if "climate-command-center" in (r.get("url") or "")), None)
         if not resource:
             resource = await ws_call(
                 ws,

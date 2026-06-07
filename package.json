@@ -1,6 +1,6 @@
 {
-  "name": "lovelace-climate-command-center",
-  "version": "0.2.0",
+  "name": "ha-climate-dashboard",
+  "version": "0.5.1",
   "type": "module",
   "description": "Unified temperature dashboard for thermostats, heated floors, and weather stations",
   "main": "dist/climate-command-center.js",

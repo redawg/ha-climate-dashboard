@@ -17,6 +17,37 @@ export const styles: CSSResultGroup = css`
     margin-bottom: 12px;
   }
 
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .edit-sensors-btn {
+    padding: 4px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: transparent;
+    color: var(--secondary-text-color);
+    font-size: 0.72rem;
+    cursor: pointer;
+  }
+
+  .edit-sensors-btn.active {
+    background: var(--primary-color, #0288d1);
+    border-color: var(--primary-color, #0288d1);
+    color: white;
+  }
+
+  .edit-hint {
+    font-size: 0.75rem;
+    color: var(--secondary-text-color);
+    margin: -4px 0 12px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: rgba(2, 136, 209, 0.1);
+  }
+
   .card-title {
     font-size: 1.15rem;
     font-weight: 600;
@@ -190,6 +221,40 @@ export const styles: CSSResultGroup = css`
   .zone-mode.mode-cool { color: #42a5f5; }
   .zone-mode.mode-auto { color: #26a69a; }
 
+  .zone-area-label {
+    font-size: 0.68rem;
+    color: var(--secondary-text-color);
+    margin-top: 2px;
+    opacity: 0.85;
+  }
+
+  .zone-floor-edit,
+  .zone-area-edit {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 4px;
+    font-size: 0.68rem;
+    color: var(--secondary-text-color);
+  }
+
+  .zone-floor-edit select,
+  .zone-area-edit select {
+    max-width: 160px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    border: 1px solid var(--divider-color);
+    background: var(--card-background-color);
+    color: var(--primary-text-color);
+    font-size: 0.68rem;
+  }
+
+  .zone-area-sensors {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
   .zone-temps {
     text-align: right;
   }
@@ -252,6 +317,61 @@ export const styles: CSSResultGroup = css`
     font-weight: 500;
   }
 
+  .height-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 12px;
+    margin: 6px 0 8px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(2, 136, 209, 0.08);
+    border: 1px solid rgba(2, 136, 209, 0.15);
+    font-size: 0.72rem;
+    color: var(--secondary-text-color);
+  }
+
+  .height-stats-meta {
+    opacity: 0.7;
+  }
+
+  .height-badge {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 0 4px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+    font-size: 0.58rem;
+    color: var(--secondary-text-color);
+    vertical-align: middle;
+  }
+
+  .height-edit,
+  .zone-height-edit {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-top: 4px;
+    font-size: 0.68rem;
+    color: var(--secondary-text-color);
+  }
+
+  .height-edit input,
+  .zone-height-edit input {
+    width: 52px;
+    padding: 2px 4px;
+    border-radius: 4px;
+    border: 1px solid var(--divider-color);
+    background: var(--card-background-color);
+    color: var(--primary-text-color);
+    font-size: 0.72rem;
+  }
+
+  .zone-height-edit {
+    margin-bottom: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
   .room-sensors-block {
     margin-top: 4px;
   }
@@ -266,15 +386,90 @@ export const styles: CSSResultGroup = css`
 
   .room-sensors-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     gap: 8px;
+    margin-bottom: 8px;
   }
 
   .room-sensor-chip {
-    padding: 10px 12px;
+    padding: 8px 10px;
     border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .other-sensors-box {
+    margin-top: 6px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.12);
+    border: 1px dashed rgba(255, 255, 255, 0.08);
+  }
+
+  .other-sensors-label,
+  .unassigned-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--secondary-text-color);
+    opacity: 0.75;
+    margin-bottom: 4px;
+  }
+
+  .other-sensors-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 8px;
+  }
+
+  .other-sensor-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
     background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 0.62rem;
+    line-height: 1.2;
+    max-width: 100%;
+  }
+
+  .other-sensor-name {
+    color: var(--secondary-text-color);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 120px;
+  }
+
+  .other-sensor-value {
+    color: var(--primary-text-color);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .sensor-assign-select {
+    width: 100%;
+    margin-top: 4px;
+    font-size: 0.65rem;
+    padding: 2px 4px;
+    border-radius: 4px;
+    border: 1px solid var(--divider-color);
+    background: var(--card-background-color);
+    color: var(--primary-text-color);
+  }
+
+  .other-sensor-chip .sensor-assign-select {
+    margin-top: 2px;
+    font-size: 0.58rem;
+    min-width: 100px;
+  }
+
+  .unassigned-block {
+    margin-top: 10px;
+    padding: 8px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
   }
 
   .room-sensor-name {

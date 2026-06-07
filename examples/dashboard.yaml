@@ -10,12 +10,15 @@ cards:
     show_weather: true
     show_room_sensors: true
     group_by_floor: true
+    allow_sensor_reassign: true
+    reference_height_ft: 5
     floors:
       - name: Main Floor
         zones:
           - Laundry
           - Living Room
           - Main Area
+          - Main Office
           - Redmond Thermostat
         room_sensors:
           - Family Room
@@ -26,9 +29,9 @@ cards:
           - Primary Bath
           - Primary Bedroom
       - name: Upper Floor
-        zones:
-          - Main Office
+        zones: []
         room_sensors:
           - Hunters
           - Sydney
           - Upstair Office
+          - Upstairs Office

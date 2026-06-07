@@ -1,5 +1,5 @@
 {
-  "name": "Climate Command Center",
+  "name": "HA - Climate Dashboard",
   "render_readme": true,
   "filename": "climate-command-center.js",
   "homeassistant": "2024.1.0"
