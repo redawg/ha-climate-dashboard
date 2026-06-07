@@ -54,6 +54,8 @@ export interface ClimateCommandCenterConfig {
   /** legacy / alias for exclude_entities in editor */
   sensor_assignments?: SensorAssignment[];
   other_sensor_patterns?: string[];
+  /** Floor plan visualization config */
+  floor_plan?: FloorPlanConfig;
 }
 
 export interface ZoneSensors {
@@ -128,4 +130,30 @@ export interface AssignableSensor {
 export interface HaAreaOption {
   area_id: string;
   name: string;
+}
+
+export interface FloorPlanThermostat {
+  entity_id: string;
+  label: string;
+  kind: 'wall' | 'floor';
+  /** X position as percentage (0–100) of floor plan width */
+  x: number;
+  /** Y position as percentage (0–100) of floor plan height */
+  y: number;
+}
+
+export interface FloorPlanRoom {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  zone?: number;
+  heated?: boolean;
+}
+
+export interface FloorPlanConfig {
+  rooms?: FloorPlanRoom[];
+  thermostats?: FloorPlanThermostat[];
 }

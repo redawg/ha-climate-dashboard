@@ -6,6 +6,7 @@ import asyncio
 import json
 import os
 import sys
+import time
 
 try:
     import websockets
@@ -21,10 +22,11 @@ HA_TOKEN = os.environ.get("HA_TOKEN", "")
 
 DASHBOARD_URL_PATH = os.environ.get("HA_DASHBOARD_PATH", "climate-dashboard")
 DASHBOARD_VIEW = "climate"
-RESOURCE_URL = os.environ.get(
+RESOURCE_BASE = os.environ.get(
     "HA_CARD_URL",
     "http://172.16.1.32:8765/climate-command-center.js",
 )
+RESOURCE_URL = f"{RESOURCE_BASE}?v={int(time.time())}"
 
 CARD_CONFIG = {
     "type": "custom:climate-command-center",
@@ -118,7 +120,16 @@ async def main() -> int:
             msg_id += 1
             print("Registered resource", RESOURCE_URL)
         else:
-            print("Resource exists", resource.get("url"))
+            await ws_call(
+                ws,
+                msg_id,
+                "lovelace/resources/update",
+                resource_id=resource["id"],
+                res_type="module",
+                url=RESOURCE_URL,
+            )
+            msg_id += 1
+            print("Updated resource URL", RESOURCE_URL)
 
         config = {
             "views": [

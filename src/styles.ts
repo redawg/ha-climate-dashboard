@@ -209,10 +209,17 @@ export const styles: CSSResultGroup = css`
     color: var(--secondary-text-color);
   }
 
+  .zone-status-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    flex-wrap: wrap;
+  }
+
   .zone-mode {
     font-size: 0.7rem;
     text-transform: uppercase;
-    margin-top: 4px;
     letter-spacing: 0.04em;
     color: var(--secondary-text-color);
   }
@@ -220,6 +227,46 @@ export const styles: CSSResultGroup = css`
   .zone-mode.mode-heat { color: #ff7043; }
   .zone-mode.mode-cool { color: #42a5f5; }
   .zone-mode.mode-auto { color: #26a69a; }
+
+  .zone-action {
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  .zone-action.action-heating {
+    background: rgba(255, 112, 67, 0.18);
+    color: #ff7043;
+  }
+
+  .zone-action.action-cooling {
+    background: rgba(66, 165, 245, 0.18);
+    color: #42a5f5;
+  }
+
+  .zone-action.action-idle {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--secondary-text-color);
+  }
+
+  .zone-action.action-off {
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--secondary-text-color);
+    opacity: 0.7;
+  }
+
+  .zone-card.action-heating {
+    border-left-color: #ff7043;
+    border-left-width: 4px;
+  }
+
+  .zone-card.action-cooling {
+    border-left-color: #42a5f5;
+    border-left-width: 4px;
+  }
 
   .zone-area-label {
     font-size: 0.68rem;
@@ -259,40 +306,66 @@ export const styles: CSSResultGroup = css`
     text-align: right;
   }
 
-  .current-temp {
-    font-size: 1.45rem;
+  .temp-target-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+
+  .target-label {
+    font-size: 0.62rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--secondary-text-color);
+    opacity: 0.8;
+  }
+
+  .target-temp {
+    font-size: 1.3rem;
     font-weight: 700;
     color: var(--primary-text-color);
   }
 
-  .target-temp {
-    display: block;
-    font-size: 0.8rem;
+  .zone-temp-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+    gap: 6px;
+    margin: 8px 0;
+    padding: 8px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .temp-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 6px 4px;
+    border-radius: 6px;
+  }
+
+  .temp-cell-label {
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     color: var(--secondary-text-color);
+    margin-bottom: 2px;
   }
 
-  .temp-delta {
-    display: inline-block;
-    margin-top: 4px;
-    font-size: 0.68rem;
-    font-weight: 600;
-    padding: 2px 6px;
-    border-radius: 999px;
+  .temp-cell-value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--primary-text-color);
   }
 
-  .temp-delta.above {
-    background: rgba(255, 112, 67, 0.18);
-    color: #ff7043;
+  .temp-cell-target {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px dashed rgba(255, 255, 255, 0.1);
   }
 
-  .temp-delta.below {
-    background: rgba(66, 165, 245, 0.18);
-    color: #42a5f5;
-  }
-
-  .temp-delta.at {
-    background: rgba(38, 166, 154, 0.18);
-    color: #26a69a;
+  .temp-cell-target .temp-cell-value {
+    color: var(--secondary-text-color);
   }
 
   .zone-sensors {
@@ -573,6 +646,302 @@ export const styles: CSSResultGroup = css`
     font-size: 0.9rem;
   }
 
+  /* ── View toggle ── */
+  .view-toggle {
+    display: flex;
+    gap: 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .view-btn {
+    padding: 4px 12px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+    color: var(--secondary-text-color);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .view-btn.active {
+    background: var(--primary-color, #0288d1);
+    color: white;
+  }
+
+  .view-btn:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  /* ── Floor Plan ── */
+  .floor-plan-container {
+    padding: 12px;
+  }
+
+  .fp-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .fp-toolbar-title {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--primary-text-color);
+  }
+
+  .fp-toolbar-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  .fp-place-btn {
+    padding: 4px 10px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    background: transparent;
+    color: var(--secondary-text-color);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .fp-place-btn:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .fp-place-btn.active {
+    background: var(--primary-color, #0288d1);
+    color: white;
+    border-color: var(--primary-color, #0288d1);
+  }
+
+  .fp-placing-hint {
+    font-size: 0.75rem;
+    color: var(--primary-color, #0288d1);
+    text-align: center;
+    padding: 4px 8px;
+    margin-bottom: 6px;
+    background: rgba(2, 136, 209, 0.08);
+    border-radius: 6px;
+  }
+
+  .floor-plan-svg {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .floor-plan-svg.placing {
+    cursor: crosshair;
+  }
+
+  .fp-room-label {
+    font-size: 12px;
+    font-weight: 600;
+    fill: var(--primary-text-color, #fff);
+  }
+
+  .fp-zone-tag {
+    font-size: 8px;
+    fill: var(--secondary-text-color, #aaa);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .fp-status {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+  }
+
+  .fp-heat { fill: #ff7043; }
+  .fp-idle { fill: var(--secondary-text-color, #999); }
+  .fp-off  { fill: #616161; }
+
+  .fp-t-lbl {
+    font-size: 7px;
+    fill: var(--secondary-text-color, #999);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .fp-t-val {
+    font-size: 13px;
+    font-weight: 600;
+    fill: var(--primary-text-color, #fff);
+  }
+
+  .fp-manifold-label {
+    font-size: 7px;
+    font-weight: 600;
+    fill: #42a5f5;
+    letter-spacing: 0.5px;
+  }
+
+  .fp-vent-label {
+    font-size: 7px;
+    fill: rgba(255, 255, 255, 0.3);
+  }
+
+  /* Thermostat markers on plan */
+  .fp-thermostat {
+    cursor: default;
+  }
+
+  .fp-tstat-icon {
+    font-size: 10px;
+    font-weight: 700;
+    fill: white;
+  }
+
+  .fp-tstat-temp {
+    font-size: 11px;
+    font-weight: 600;
+    fill: var(--primary-text-color, #fff);
+  }
+
+  .fp-tstat-name {
+    font-size: 8px;
+    fill: var(--secondary-text-color, #aaa);
+  }
+
+  /* Thermostat editor list */
+  .fp-tstat-list {
+    margin-top: 12px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .fp-tstat-list-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--secondary-text-color);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .fp-tstat-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .fp-tstat-row:last-child {
+    border-bottom: none;
+  }
+
+  .fp-tstat-badge {
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    flex-shrink: 0;
+  }
+
+  .fp-tstat-badge.wall {
+    background: rgba(76, 175, 80, 0.2);
+    color: #4caf50;
+  }
+
+  .fp-tstat-badge.floor {
+    background: rgba(255, 152, 0, 0.2);
+    color: #ff9800;
+  }
+
+  .fp-tstat-input {
+    flex: 1;
+    min-width: 80px;
+    padding: 4px 8px;
+    font-size: 0.75rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: var(--primary-text-color);
+  }
+
+  .fp-tstat-select {
+    flex: 1;
+    min-width: 120px;
+    padding: 4px 6px;
+    font-size: 0.7rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: var(--primary-text-color);
+  }
+
+  .fp-tstat-pos {
+    font-size: 0.65rem;
+    color: var(--secondary-text-color);
+    flex-shrink: 0;
+  }
+
+  .fp-tstat-del {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 82, 82, 0.1);
+    color: #ff5252;
+    font-size: 0.7rem;
+    cursor: pointer;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s;
+  }
+
+  .fp-tstat-del:hover {
+    background: rgba(255, 82, 82, 0.3);
+  }
+
+  /* Legend bar */
+  .fp-legend-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 10px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.12);
+    border-radius: 6px;
+  }
+
+  .fp-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 0.7rem;
+    color: var(--secondary-text-color);
+  }
+
+  .fp-legend-swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    border: 1.5px solid;
+    flex-shrink: 0;
+  }
+
+  .fp-legend-circle {
+    border-radius: 50%;
+    background: transparent !important;
+  }
+
   @media (max-width: 600px) {
     .weather-strip {
       flex-direction: column;
@@ -589,6 +958,14 @@ export const styles: CSSResultGroup = css`
     .zones-grid,
     .room-sensors-grid {
       grid-template-columns: 1fr;
+    }
+
+    .floor-plan-svg {
+      min-height: 280px;
+    }
+
+    .fp-summary {
+      flex-direction: column;
     }
   }
 `;
