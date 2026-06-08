@@ -1,9 +1,19 @@
 node_modules/
 *.log
 .DS_Store
-*.txt
+
+# Intermediate image artifacts (regenerated from PDF)
+floorplan-cropped.png
+floorplan-pre-invert.png
+page1.png
+dist/floorplan.svg
+
+# One-off scripts and debug files
 _hacs_ws_test.py
 deploy_ha_ws.py
 serve_ha.py
 ws_probe_tmp.py
-probe.txt
+
+# Debug/scratch text files
+*.txt
+!README.txt

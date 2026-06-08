@@ -136,15 +136,16 @@ export interface FloorPlanThermostat {
   entity_id: string;
   label: string;
   kind: 'wall' | 'floor';
-  /** X position as percentage (0–100) of floor plan width */
+  /** X position as percentage (0\u2013100) of floor plan width */
   x: number;
-  /** Y position as percentage (0–100) of floor plan height */
+  /** Y position as percentage (0\u2013100) of floor plan height */
   y: number;
 }
 
-export interface FloorPlanRoom {
+export interface FloorPlanArea {
   id: string;
   label: string;
+  /** Position/size as percentage of floor plan image (0\u2013100) */
   x: number;
   y: number;
   w: number;
@@ -154,6 +155,7 @@ export interface FloorPlanRoom {
 }
 
 export interface FloorPlanConfig {
-  rooms?: FloorPlanRoom[];
+  image_url?: string;
+  areas?: FloorPlanArea[];
   thermostats?: FloorPlanThermostat[];
 }

@@ -22,9 +22,11 @@ HA_TOKEN = os.environ.get("HA_TOKEN", "")
 
 DASHBOARD_URL_PATH = os.environ.get("HA_DASHBOARD_PATH", "climate-dashboard")
 DASHBOARD_VIEW = "climate"
+# HACS serves custom cards from /hacsfiles/<repo-name>/<filename>
+# Override with HA_CARD_URL for dev server or other setups
 RESOURCE_BASE = os.environ.get(
     "HA_CARD_URL",
-    "http://172.16.1.32:8765/climate-command-center.js",
+    "/hacsfiles/ha-climate-dashboard/climate-command-center.js",
 )
 RESOURCE_URL = f"{RESOURCE_BASE}?v={int(time.time())}"
 
@@ -137,6 +139,7 @@ async def main() -> int:
                     "title": "Climate",
                     "path": DASHBOARD_VIEW,
                     "icon": "mdi:thermometer",
+                    "panel": True,
                     "cards": [CARD_CONFIG],
                 }
             ]
