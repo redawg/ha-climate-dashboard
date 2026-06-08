@@ -730,86 +730,251 @@ export const styles: CSSResultGroup = css`
     border-radius: 6px;
   }
 
-  .floor-plan-svg {
-    width: 100%;
-    height: auto;
-    border-radius: 8px;
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+  /* Floor plan — full-width mode */
+  :host {
+    --fp-active: 0;
   }
 
-  .floor-plan-svg.placing {
+  /* Floor plan — embedded image with sensor overlays */
+  .fp-map {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .fp-map.placing {
     cursor: crosshair;
   }
 
-  .fp-room-label {
-    font-size: 12px;
+  .fp-img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+  }
+
+  /* Interactive room areas overlaid on the plan */
+  .fp-area {
+    position: absolute;
+    border: 1.5px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    z-index: 5;
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .fp-area:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.35);
+  }
+
+  .fp-area.heated {
+    border-color: rgba(255, 152, 0, 0.25);
+  }
+
+  .fp-area.heated:hover {
+    background: rgba(255, 152, 0, 0.08);
+    border-color: rgba(255, 152, 0, 0.5);
+  }
+
+  .fp-area.unheated {
+    border-color: rgba(150, 150, 150, 0.2);
+    border-style: dashed;
+  }
+
+  .fp-area.selected {
+    border-color: var(--primary-color, #0288d1);
+    background: rgba(2, 136, 209, 0.1);
+    box-shadow: 0 0 8px rgba(2, 136, 209, 0.3);
+  }
+
+  .fp-area.placeable {
+    cursor: crosshair;
+    animation: fp-area-pulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes fp-area-pulse {
+    0%, 100% { border-color: rgba(255, 152, 0, 0.3); }
+    50% { border-color: rgba(255, 152, 0, 0.7); }
+  }
+
+  .fp-area.zone-1 { border-color: rgba(76, 175, 80, 0.3); }
+  .fp-area.zone-1:hover, .fp-area.zone-1.selected { border-color: rgba(76, 175, 80, 0.7); }
+  .fp-area.zone-2 { border-color: rgba(33, 150, 243, 0.3); }
+  .fp-area.zone-2:hover, .fp-area.zone-2.selected { border-color: rgba(33, 150, 243, 0.7); }
+  .fp-area.zone-3 { border-color: rgba(156, 39, 176, 0.3); }
+  .fp-area.zone-3:hover, .fp-area.zone-3.selected { border-color: rgba(156, 39, 176, 0.7); }
+  .fp-area.zone-4 { border-color: rgba(244, 67, 54, 0.3); }
+  .fp-area.zone-4:hover, .fp-area.zone-4.selected { border-color: rgba(244, 67, 54, 0.7); }
+
+  .fp-area-label {
+    font-size: 0.6rem;
     font-weight: 600;
-    fill: var(--primary-text-color, #fff);
+    color: rgba(255, 255, 255, 0.6);
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+    pointer-events: none;
+    text-align: center;
+    line-height: 1.1;
   }
 
-  .fp-zone-tag {
-    font-size: 8px;
-    fill: var(--secondary-text-color, #aaa);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+  .fp-area:hover .fp-area-label {
+    color: rgba(255, 255, 255, 0.9);
   }
 
-  .fp-status {
+  .fp-area-count {
+    font-size: 0.5rem;
+    color: rgba(255, 255, 255, 0.45);
+    pointer-events: none;
+  }
+
+  /* Area detail panel */
+  .fp-area-detail {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .fp-area-detail-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .fp-area-detail-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--primary-text-color);
+  }
+
+  .fp-area-detail-zone {
+    font-size: 0.7rem;
+    color: var(--secondary-text-color);
+    margin-left: auto;
+  }
+
+  .fp-area-detail-close {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: transparent;
+    color: var(--secondary-text-color);
+    font-size: 0.7rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .fp-area-detail-sensors {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .fp-area-sensor-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  }
+
+  .fp-area-sensor-row:last-child {
+    border-bottom: none;
+  }
+
+  .fp-area-sensor-label {
+    font-size: 0.75rem;
+    color: var(--primary-text-color);
+    flex-shrink: 0;
+    min-width: 80px;
+  }
+
+  .fp-area-sensor-temp {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--primary-text-color);
+    flex-shrink: 0;
+    min-width: 40px;
+  }
+
+  .fp-tstat-select.compact {
+    min-width: 100px;
+    font-size: 0.65rem;
+    padding: 2px 4px;
+  }
+
+  .fp-area-detail-empty {
+    font-size: 0.75rem;
+    color: var(--secondary-text-color);
+    padding: 4px 0;
+    font-style: italic;
+  }
+
+  /* Sensor markers overlaid on the plan */
+  .fp-marker {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .fp-marker-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     font-size: 9px;
     font-weight: 700;
-    letter-spacing: 0.5px;
+    color: white;
+    flex-shrink: 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
   }
 
-  .fp-heat { fill: #ff7043; }
-  .fp-idle { fill: var(--secondary-text-color, #999); }
-  .fp-off  { fill: #616161; }
-
-  .fp-t-lbl {
-    font-size: 7px;
-    fill: var(--secondary-text-color, #999);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+  .fp-marker.wall .fp-marker-dot {
+    background: rgba(76, 175, 80, 0.8);
+    border: 2px solid #4caf50;
   }
 
-  .fp-t-val {
-    font-size: 13px;
-    font-weight: 600;
-    fill: var(--primary-text-color, #fff);
+  .fp-marker.floor .fp-marker-dot {
+    background: rgba(255, 152, 0, 0.8);
+    border: 2px solid #ff9800;
   }
 
-  .fp-manifold-label {
-    font-size: 7px;
-    font-weight: 600;
-    fill: #42a5f5;
-    letter-spacing: 0.5px;
+  .fp-marker-info {
+    display: flex;
+    flex-direction: column;
+    background: rgba(0, 0, 0, 0.75);
+    border-radius: 4px;
+    padding: 2px 6px;
+    white-space: nowrap;
   }
 
-  .fp-vent-label {
-    font-size: 7px;
-    fill: rgba(255, 255, 255, 0.3);
+  .fp-marker-label {
+    font-size: 0.55rem;
+    color: var(--secondary-text-color, #aaa);
   }
 
-  /* Thermostat markers on plan */
-  .fp-thermostat {
-    cursor: default;
-  }
-
-  .fp-tstat-icon {
-    font-size: 10px;
+  .fp-marker-temp {
+    font-size: 0.75rem;
     font-weight: 700;
-    fill: white;
-  }
-
-  .fp-tstat-temp {
-    font-size: 11px;
-    font-weight: 600;
-    fill: var(--primary-text-color, #fff);
-  }
-
-  .fp-tstat-name {
-    font-size: 8px;
-    fill: var(--secondary-text-color, #aaa);
+    color: var(--primary-text-color, #fff);
   }
 
   /* Thermostat editor list */
@@ -940,6 +1105,29 @@ export const styles: CSSResultGroup = css`
   .fp-legend-circle {
     border-radius: 50%;
     background: transparent !important;
+  }
+
+  .fp-swatch-wall {
+    background: rgba(76, 175, 80, 0.5);
+    border-color: #4caf50;
+    border-radius: 50%;
+  }
+
+  .fp-swatch-floor {
+    background: rgba(255, 152, 0, 0.5);
+    border-color: #ff9800;
+    border-radius: 50%;
+  }
+
+  .fp-swatch-heated {
+    background: rgba(255, 152, 0, 0.1);
+    border-color: #ff9800;
+  }
+
+  .fp-swatch-unheated {
+    background: rgba(150, 150, 150, 0.15);
+    border-color: #999;
+    border-style: dashed;
   }
 
   @media (max-width: 600px) {

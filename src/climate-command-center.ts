@@ -6,8 +6,6 @@ import {
   AreaSensor,
   ClimateCommandCenterConfig,
   ClimateZone,
-  FloorPlanConfig,
-  FloorPlanRoom,
   FloorPlanThermostat,
   FloorSection,
   WeatherData,
@@ -15,6 +13,7 @@ import {
 } from './types';
 import { buildFloorSections, buildZones, DEFAULT_FLOORS, floorNames, getWeatherData, autoAssignSensorToZone, listHaAreas } from './utils/entity-resolver';
 import { computeZoneHeightStats } from './utils/height-averages';
+import { FLOORPLAN_IMAGE } from './floorplan-image';
 
 declare global {
   interface Window {
@@ -35,6 +34,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   @state() private _editSensors = false;
   @state() private _view: 'cards' | 'floorplan' = 'floorplan';
   @state() private _placingThermostat: 'wall' | 'floor' | null = null;
+  @state() private _selectedArea: string | null = null;
 
   static get styles(): CSSResultGroup {
     return styles;
@@ -613,76 +613,13 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     `;
   }
 
-  /* ── Floor plan data helpers ── */
-
-  private static readonly FP_ZONE_MAP: Array<{
-    zone: number; label: string; sqft: number; climate_entity: string;
-  }> = [
-    { zone: 1, label: 'Laundry',     sqft: 54,  climate_entity: 'climate.laundry_laundry' },
-    { zone: 2, label: 'Main Area',   sqft: 577, climate_entity: 'climate.main_area_main_area' },
-    { zone: 3, label: 'Kitchen',     sqft: 187, climate_entity: 'climate.main_floor' },
-    { zone: 4, label: 'Living Room', sqft: 98,  climate_entity: 'climate.living_room_living_room' },
-  ];
-
-  private static readonly DEFAULT_FP_ROOMS: FloorPlanRoom[] = [
-    // Rooms positioned as percentage of a 100x100 viewport.
-    // Layout derived from the ThermalBoard zoning drawing.
-    // Top row (left to right): Entry | Living Room | Family Room / Main Area | Kitchen
-    // Bottom row: Laundry | Hallway | Main Office | Pantry
-    { id: 'entry',       label: 'Entry',       x: 0,  y: 0,  w: 15, h: 35, heated: false },
-    { id: 'living',      label: 'Living Room', x: 15, y: 0,  w: 22, h: 55, zone: 4, heated: true },
-    { id: 'family',      label: 'Family Room', x: 37, y: 0,  w: 33, h: 55, zone: 2, heated: true },
-    { id: 'kitchen',     label: 'Kitchen',     x: 70, y: 0,  w: 30, h: 40, zone: 3, heated: true },
-    { id: 'pantry',      label: 'Pantry',      x: 70, y: 40, w: 15, h: 20, heated: false },
-    { id: 'laundry',     label: 'Laundry',     x: 0,  y: 55, w: 15, h: 25, zone: 1, heated: true },
-    { id: 'hall',        label: 'Hallway',     x: 15, y: 55, w: 15, h: 25, zone: 2, heated: true },
-    { id: 'office',      label: 'Main Office', x: 30, y: 55, w: 25, h: 25, heated: false },
-    { id: 'stairs',      label: 'Stairs',      x: 0,  y: 35, w: 15, h: 20, heated: false },
-    { id: 'half_bath',   label: '1/2 Bath',    x: 55, y: 55, w: 15, h: 25, heated: false },
-    { id: 'dining',      label: 'Dining',      x: 85, y: 40, w: 15, h: 20, heated: false },
-  ];
-
-  private get fpRooms(): FloorPlanRoom[] {
-    return this._config.floor_plan?.rooms?.length
-      ? this._config.floor_plan.rooms
-      : ClimateCommandCenterCard.DEFAULT_FP_ROOMS;
-  }
+  /* ── Floor plan ── */
 
   private get fpThermostats(): FloorPlanThermostat[] {
     return this._config.floor_plan?.thermostats ?? [];
   }
 
-  private fpZoneData(zoneNum: number) {
-    const m = ClimateCommandCenterCard.FP_ZONE_MAP.find((z) => z.zone === zoneNum);
-    if (!m) return null;
-    const st = this.hass.states[m.climate_entity];
-    const attrs = st?.attributes ?? {};
-    const linked = this.zoneOptions.find((z) => z.climate_entity === m.climate_entity);
-    return {
-      ...m,
-      state: st?.state,
-      action: attrs.hvac_action as string | undefined,
-      current: attrs.current_temperature as number | undefined,
-      target: attrs.temperature as number | undefined,
-      floor_temp: linked?.sensors.floor,
-      room_temp: linked?.sensors.room,
-    };
-  }
-
-  private fpZoneColor(action?: string, state?: string): string {
-    if (state === 'off') return 'rgba(97,97,97,0.18)';
-    if (action === 'heating') return 'rgba(255,112,67,0.28)';
-    if (action === 'cooling') return 'rgba(66,165,245,0.28)';
-    return 'rgba(255,152,0,0.10)';
-  }
-  private fpZoneStroke(action?: string, state?: string): string {
-    if (state === 'off') return '#616161';
-    if (action === 'heating') return '#ff7043';
-    if (action === 'cooling') return '#42a5f5';
-    return '#ff9800';
-  }
-
-  private fpThermostatData(entityId: string) {
+  private fpEntityData(entityId: string) {
     const st = this.hass.states[entityId];
     if (!st) return null;
     const attrs = st.attributes ?? {};
@@ -695,21 +632,16 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
         : (parseFloat(st.state) || undefined),
       target: isClimate ? (attrs.temperature as number | undefined) : undefined,
       name: (attrs.friendly_name as string) ?? entityId,
-      unit: (attrs.unit_of_measurement as string) ?? (isClimate ? '°' : ''),
+      unit: (attrs.unit_of_measurement as string) ?? '',
     };
   }
 
   private handleFpClick(e: MouseEvent): void {
     if (!this._placingThermostat) return;
-    const svg = (e.currentTarget as SVGSVGElement);
-    const pt = svg.createSVGPoint();
-    pt.x = e.clientX;
-    pt.y = e.clientY;
-    const ctm = svg.getScreenCTM();
-    if (!ctm) return;
-    const svgPt = pt.matrixTransform(ctm.inverse());
-    const x = Math.round(svgPt.x / 7);
-    const y = Math.round(svgPt.y / 5);
+    const container = (e.currentTarget as HTMLElement);
+    const rect = container.getBoundingClientRect();
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
 
     const newTstat: FloorPlanThermostat = {
       entity_id: '',
@@ -753,59 +685,15 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     fireEvent(this, 'config-changed', { config: newConfig });
   }
 
-  private renderFpManifold(rooms: FloorPlanRoom[], W: number, H: number, PAD: number): TemplateResult | string {
-    const pantry = rooms.find((r) => r.id === 'pantry');
-    if (!pantry) return '';
-    const mx = PAD + ((pantry.x + pantry.w / 2) / 100) * (W - PAD * 2);
-    const my = PAD + ((pantry.y + pantry.h / 2) / 100) * (H - PAD * 2);
-    return html`
-      <rect x="${mx - 30}" y="${my + 4}" width="60" height="18" rx="3"
-            fill="rgba(2,136,209,0.25)" stroke="#0288d1" stroke-width="1.5"/>
-      <text x="${mx}" y="${my + 17}" class="fp-manifold-label" text-anchor="middle">MANIFOLD</text>
-      <text x="${mx}" y="${my + 32}" class="fp-vent-label" text-anchor="middle">10 loops</text>
-    `;
-  }
-
-  private renderFpPexRuns(rooms: FloorPlanRoom[], W: number, H: number, PAD: number): TemplateResult[] {
-    const pantry = rooms.find((r) => r.id === 'pantry');
-    if (!pantry) return [];
-    const mx = PAD + ((pantry.x + pantry.w / 2) / 100) * (W - PAD * 2);
-    const my = PAD + ((pantry.y + pantry.h / 2) / 100) * (H - PAD * 2);
-    return rooms.filter((r) => r.heated).map((r) => {
-      const tx = PAD + ((r.x + r.w / 2) / 100) * (W - PAD * 2);
-      const ty = PAD + ((r.y + r.h / 2) / 100) * (H - PAD * 2);
-      return html`<line x1="${mx}" y1="${my}" x2="${tx}" y2="${ty}"
-                        stroke="#0288d1" stroke-width="1" stroke-dasharray="4" opacity="0.3"/>`;
-    });
-  }
-
-  private renderFpVents(W: number, H: number, PAD: number): TemplateResult[] {
-    const vents = [
-      { rx: 45, ry: 30 }, { rx: 55, ry: 45 },
-      { rx: 25, ry: 25 }, { rx: 80, ry: 20 }, { rx: 80, ry: 35 },
-    ];
-    return vents.map((v) => {
-      const vx = PAD + (v.rx / 100) * (W - PAD * 2);
-      const vy = PAD + (v.ry / 100) * (H - PAD * 2);
-      return html`<circle cx="${vx}" cy="${vy}" r="4" fill="none"
-                          stroke="rgba(255,255,255,0.2)" stroke-width="1"/>`;
-    });
-  }
-
   private renderFloorPlan(): TemplateResult {
-    const rooms = this.fpRooms;
     const thermostats = this.fpThermostats;
     const placing = this._placingThermostat;
-    const allSensors = Object.keys(this.hass.states).filter((e) =>
-      e.startsWith('climate.') || e.startsWith('sensor.'));
-
-    // SVG viewBox: 700x500 gives space for the layout
-    const W = 700, H = 500;
-    const PAD = 15;
+    const allEntities = Object.keys(this.hass.states)
+      .filter((e) => e.startsWith('climate.') || e.startsWith('sensor.'))
+      .sort();
 
     return html`
       <div class="floor-plan-container">
-        <!-- Toolbar -->
         <div class="fp-toolbar">
           <span class="fp-toolbar-title">Heated Floor Plan</span>
           <div class="fp-toolbar-actions">
@@ -819,105 +707,33 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             </button>
           </div>
         </div>
-        ${placing ? html`<div class="fp-placing-hint">Click on the floor plan to place the ${placing === 'wall' ? 'wall thermostat' : 'floor sensor'}</div>` : ''}
+        ${placing
+          ? html`<div class="fp-placing-hint">Click on the floor plan to place a ${placing === 'wall' ? 'wall thermostat' : 'floor sensor'}</div>`
+          : ''}
 
-        <svg viewBox="0 0 ${W} ${H}" class="floor-plan-svg ${placing ? 'placing' : ''}"
-             xmlns="http://www.w3.org/2000/svg"
+        <div class="fp-map ${placing ? 'placing' : ''}"
              @click=${(e: MouseEvent) => this.handleFpClick(e)}>
-          <defs>
-            <pattern id="fp-grid" width="14" height="14" patternUnits="userSpaceOnUse">
-              <path d="M 14 0 L 0 0 0 14" fill="none" stroke="rgba(255,255,255,0.025)" stroke-width="0.5"/>
-            </pattern>
-          </defs>
-          <rect width="${W}" height="${H}" fill="url(#fp-grid)" rx="8"/>
+          <img class="fp-img" src="${FLOORPLAN_IMAGE}" alt="Floor Plan"/>
 
-          <!-- House outer walls -->
-          <rect x="${PAD}" y="${PAD}" width="${W - PAD * 2}" height="${H - PAD * 2}" rx="3"
-                fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2.5"/>
-
-          <!-- Rooms -->
-          ${rooms.map((room) => {
-            const rx = PAD + (room.x / 100) * (W - PAD * 2);
-            const ry = PAD + (room.y / 100) * (H - PAD * 2);
-            const rw = (room.w / 100) * (W - PAD * 2);
-            const rh = (room.h / 100) * (H - PAD * 2);
-            const zd = room.zone != null ? this.fpZoneData(room.zone) : null;
-            const fill = room.heated && zd ? this.fpZoneColor(zd.action, zd.state) : 'rgba(255,255,255,0.02)';
-            const stroke = room.heated && zd ? this.fpZoneStroke(zd.action, zd.state) : 'rgba(255,255,255,0.10)';
-            const sw = room.heated ? '2' : '1';
-            const cx = rx + rw / 2;
-            const cy = ry + rh / 2;
-
-            return html`
-              <g class="fp-room">
-                <rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="2"
-                      fill="${fill}" stroke="${stroke}" stroke-width="${sw}"/>
-                <text x="${cx}" y="${cy - (zd ? 14 : 4)}" class="fp-room-label" text-anchor="middle">${room.label}</text>
-                ${room.zone != null ? html`
-                  <text x="${cx}" y="${cy}" class="fp-zone-tag" text-anchor="middle">Zone ${room.zone}</text>
-                ` : ''}
-                ${zd && room.heated ? html`
-                  ${zd.action === 'heating'
-                    ? html`<text x="${cx}" y="${cy + 14}" class="fp-status fp-heat" text-anchor="middle">HEATING</text>`
-                    : zd.state === 'off'
-                      ? html`<text x="${cx}" y="${cy + 14}" class="fp-status fp-off" text-anchor="middle">OFF</text>`
-                      : html`<text x="${cx}" y="${cy + 14}" class="fp-status fp-idle" text-anchor="middle">IDLE</text>`
-                  }
-                  <!-- Temps row -->
-                  ${rw > 100 ? html`
-                    ${zd.floor_temp != null ? html`
-                      <text x="${cx - 40}" y="${cy + 32}" class="fp-t-lbl" text-anchor="middle">FLR</text>
-                      <text x="${cx - 40}" y="${cy + 46}" class="fp-t-val" text-anchor="middle">${zd.floor_temp}°</text>
-                    ` : ''}
-                    ${zd.room_temp != null ? html`
-                      <text x="${cx}" y="${cy + 32}" class="fp-t-lbl" text-anchor="middle">ROOM</text>
-                      <text x="${cx}" y="${cy + 46}" class="fp-t-val" text-anchor="middle">${zd.room_temp}°</text>
-                    ` : ''}
-                    <text x="${cx + 40}" y="${cy + 32}" class="fp-t-lbl" text-anchor="middle">TGT</text>
-                    <text x="${cx + 40}" y="${cy + 46}" class="fp-t-val" text-anchor="middle">${zd.target ?? '—'}°</text>
-                  ` : html`
-                    <text x="${cx}" y="${cy + 30}" class="fp-t-val" text-anchor="middle">${zd.target ?? '—'}°</text>
-                  `}
-                ` : ''}
-              </g>
-            `;
-          })}
-
-          <!-- Manifold marker in Pantry area -->
-          ${this.renderFpManifold(rooms, W, H, PAD)}
-
-          <!-- PEX runs from manifold -->
-          ${this.renderFpPexRuns(rooms, W, H, PAD)}
-
-          <!-- Floor vents -->
-          ${this.renderFpVents(W, H, PAD)}
-
-          <!-- Placed thermostats -->
-          ${thermostats.map((t, idx) => {
-            const tx = PAD + (t.x / 100) * (W - PAD * 2);
-            const ty = PAD + (t.y / 100) * (H - PAD * 2);
-            const td = t.entity_id ? this.fpThermostatData(t.entity_id) : null;
+          ${thermostats.map((t) => {
+            const td = t.entity_id ? this.fpEntityData(t.entity_id) : null;
             const isWall = t.kind === 'wall';
             return html`
-              <g class="fp-thermostat" transform="translate(${tx}, ${ty})">
-                <circle r="12" fill="${isWall ? 'rgba(76,175,80,0.3)' : 'rgba(255,152,0,0.3)'}"
-                        stroke="${isWall ? '#4caf50' : '#ff9800'}" stroke-width="1.5"/>
-                <text y="1" class="fp-tstat-icon" text-anchor="middle">${isWall ? 'T' : 'F'}</text>
-                ${td ? html`
-                  <text x="16" y="-4" class="fp-tstat-temp" text-anchor="start">${td.current ?? '—'}°</text>
-                  <text x="16" y="8" class="fp-tstat-name" text-anchor="start">${t.label}</text>
-                ` : html`
-                  <text x="16" y="4" class="fp-tstat-name" text-anchor="start">${t.label}</text>
-                `}
-              </g>
+              <div class="fp-marker ${isWall ? 'wall' : 'floor'}"
+                   style="left:${t.x}%;top:${t.y}%">
+                <div class="fp-marker-dot">${isWall ? 'T' : 'F'}</div>
+                <div class="fp-marker-info">
+                  <span class="fp-marker-label">${t.label}</span>
+                  ${td ? html`<span class="fp-marker-temp">${td.current ?? '—'}${td.unit || '°'}</span>` : ''}
+                </div>
+              </div>
             `;
           })}
-        </svg>
+        </div>
 
-        <!-- Thermostat list / editor below the plan -->
         ${thermostats.length ? html`
           <div class="fp-tstat-list">
-            <div class="fp-tstat-list-title">Thermostats on Plan</div>
+            <div class="fp-tstat-list-title">Sensors on Plan</div>
             ${thermostats.map((t, idx) => html`
               <div class="fp-tstat-row">
                 <span class="fp-tstat-badge ${t.kind}">${t.kind === 'wall' ? 'Wall' : 'Floor'}</span>
@@ -927,27 +743,21 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                 <select class="fp-tstat-select"
                         @change=${(e: Event) => this.updateFpThermostat(idx, 'entity_id', (e.target as HTMLSelectElement).value)}>
                   <option value="" ?selected=${!t.entity_id}>Pick entity...</option>
-                  ${allSensors.map((eid) => html`
+                  ${allEntities.map((eid) => html`
                     <option value="${eid}" ?selected=${t.entity_id === eid}>
                       ${(this.hass.states[eid]?.attributes?.friendly_name as string) ?? eid}
                     </option>
                   `)}
                 </select>
-                <span class="fp-tstat-pos">(${t.x}, ${t.y})</span>
                 <button class="fp-tstat-del" @click=${() => this.removeFpThermostat(idx)}>✕</button>
               </div>
             `)}
           </div>
         ` : ''}
 
-        <!-- Legend -->
         <div class="fp-legend-bar">
-          <div class="fp-legend-item"><span class="fp-legend-swatch" style="background:rgba(255,112,67,0.28);border-color:#ff7043"></span>Heating</div>
-          <div class="fp-legend-item"><span class="fp-legend-swatch" style="background:rgba(255,152,0,0.10);border-color:#ff9800"></span>Idle</div>
-          <div class="fp-legend-item"><span class="fp-legend-swatch" style="background:rgba(97,97,97,0.18);border-color:#616161"></span>Off</div>
-          <div class="fp-legend-item"><span class="fp-legend-swatch fp-legend-circle" style="border-color:rgba(255,255,255,0.2)"></span>Vent</div>
-          <div class="fp-legend-item"><span class="fp-legend-swatch" style="background:rgba(76,175,80,0.3);border-color:#4caf50;border-radius:50%"></span>Wall T-stat</div>
-          <div class="fp-legend-item"><span class="fp-legend-swatch" style="background:rgba(255,152,0,0.3);border-color:#ff9800;border-radius:50%"></span>Floor Sensor</div>
+          <div class="fp-legend-item"><span class="fp-legend-swatch fp-swatch-wall"></span>Wall Thermostat</div>
+          <div class="fp-legend-item"><span class="fp-legend-swatch fp-swatch-floor"></span>Floor Sensor</div>
         </div>
       </div>
     `;
