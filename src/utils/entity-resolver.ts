@@ -39,6 +39,15 @@ const EXCLUDE_PATTERNS = [
   'unvr',
   'poe temperature',
   'switch temperature',
+  // HP printers (ink/toner levels, print status)
+  'printer',
+  'toner',
+  'cartridge',
+  ' ink',
+  'officejet',
+  'laserjet',
+  'envy',
+  'deskjet',
   ...WEATHER_PATTERNS,
 ];
 
