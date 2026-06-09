@@ -17,3 +17,8 @@ ws_probe_tmp.py
 # Debug/scratch text files
 *.txt
 !README.txt
+
+# Temp payload / debug files
+.push_payload.json
+.push_dist_payload.json
+scripts/_debug_text.py

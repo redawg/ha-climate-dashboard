@@ -646,7 +646,7 @@ export const styles: CSSResultGroup = css`
     font-size: 0.9rem;
   }
 
-  /* ── View toggle ── */
+  /* \u2500\u2500 View toggle \u2500\u2500 */
   .view-toggle {
     display: flex;
     gap: 0;
@@ -675,7 +675,7 @@ export const styles: CSSResultGroup = css`
     background: rgba(255, 255, 255, 0.05);
   }
 
-  /* ── Floor Plan ── */
+  /* \u2500\u2500 Floor Plan \u2500\u2500 */
   .floor-plan-container {
     padding: 12px;
   }
@@ -730,12 +730,12 @@ export const styles: CSSResultGroup = css`
     border-radius: 6px;
   }
 
-  /* Floor plan — full-width mode */
+  /* Floor plan \u2014 full-width mode */
   :host {
     --fp-active: 0;
   }
 
-  /* Floor plan — embedded image with sensor overlays */
+  /* Floor plan \u2014 embedded image with sensor overlays */
   .fp-map {
     position: relative;
     border-radius: 8px;
@@ -752,161 +752,6 @@ export const styles: CSSResultGroup = css`
     width: 100%;
     height: auto;
     border-radius: 8px;
-  }
-
-  /* Interactive room areas overlaid on the plan */
-  .fp-area {
-    position: absolute;
-    border: 1.5px solid rgba(255, 255, 255, 0.15);
-    border-radius: 4px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    z-index: 5;
-    background: rgba(255, 255, 255, 0.02);
-  }
-
-  .fp-area:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.35);
-  }
-
-  .fp-area.heated {
-    border-color: rgba(255, 152, 0, 0.25);
-  }
-
-  .fp-area.heated:hover {
-    background: rgba(255, 152, 0, 0.08);
-    border-color: rgba(255, 152, 0, 0.5);
-  }
-
-  .fp-area.unheated {
-    border-color: rgba(150, 150, 150, 0.2);
-    border-style: dashed;
-  }
-
-  .fp-area.selected {
-    border-color: var(--primary-color, #0288d1);
-    background: rgba(2, 136, 209, 0.1);
-    box-shadow: 0 0 8px rgba(2, 136, 209, 0.3);
-  }
-
-  .fp-area.placeable {
-    cursor: crosshair;
-    animation: fp-area-pulse 1.5s ease-in-out infinite;
-  }
-
-  @keyframes fp-area-pulse {
-    0%, 100% { border-color: rgba(255, 152, 0, 0.3); }
-    50% { border-color: rgba(255, 152, 0, 0.7); }
-  }
-
-  .fp-area.zone-1 { border-color: rgba(76, 175, 80, 0.3); }
-  .fp-area.zone-1:hover, .fp-area.zone-1.selected { border-color: rgba(76, 175, 80, 0.7); }
-  .fp-area.zone-2 { border-color: rgba(33, 150, 243, 0.3); }
-  .fp-area.zone-2:hover, .fp-area.zone-2.selected { border-color: rgba(33, 150, 243, 0.7); }
-  .fp-area.zone-3 { border-color: rgba(156, 39, 176, 0.3); }
-  .fp-area.zone-3:hover, .fp-area.zone-3.selected { border-color: rgba(156, 39, 176, 0.7); }
-  .fp-area.zone-4 { border-color: rgba(244, 67, 54, 0.3); }
-  .fp-area.zone-4:hover, .fp-area.zone-4.selected { border-color: rgba(244, 67, 54, 0.7); }
-
-  .fp-area-label {
-    font-size: 0.6rem;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.6);
-    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
-    pointer-events: none;
-    text-align: center;
-    line-height: 1.1;
-  }
-
-  .fp-area:hover .fp-area-label {
-    color: rgba(255, 255, 255, 0.9);
-  }
-
-  .fp-area-count {
-    font-size: 0.5rem;
-    color: rgba(255, 255, 255, 0.45);
-    pointer-events: none;
-  }
-
-  /* Area detail panel */
-  .fp-area-detail {
-    margin-top: 10px;
-    padding: 10px 12px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-  }
-
-  .fp-area-detail-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 8px;
-  }
-
-  .fp-area-detail-name {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: var(--primary-text-color);
-  }
-
-  .fp-area-detail-zone {
-    font-size: 0.7rem;
-    color: var(--secondary-text-color);
-    margin-left: auto;
-  }
-
-  .fp-area-detail-close {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    background: transparent;
-    color: var(--secondary-text-color);
-    font-size: 0.7rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .fp-area-detail-sensors {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-  }
-
-  .fp-area-sensor-row {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 0;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  }
-
-  .fp-area-sensor-row:last-child {
-    border-bottom: none;
-  }
-
-  .fp-area-sensor-label {
-    font-size: 0.75rem;
-    color: var(--primary-text-color);
-    flex-shrink: 0;
-    min-width: 80px;
-  }
-
-  .fp-area-sensor-temp {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--primary-text-color);
-    flex-shrink: 0;
-    min-width: 40px;
   }
 
   .fp-tstat-select.compact {
@@ -1122,12 +967,6 @@ export const styles: CSSResultGroup = css`
   .fp-swatch-heated {
     background: rgba(255, 152, 0, 0.1);
     border-color: #ff9800;
-  }
-
-  .fp-swatch-unheated {
-    background: rgba(150, 150, 150, 0.15);
-    border-color: #999;
-    border-style: dashed;
   }
 
   @media (max-width: 600px) {

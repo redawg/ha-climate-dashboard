@@ -34,7 +34,6 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   @state() private _editSensors = false;
   @state() private _view: 'cards' | 'floorplan' = 'floorplan';
   @state() private _placingThermostat: 'wall' | 'floor' | null = null;
-  @state() private _selectedArea: string | null = null;
 
   static get styles(): CSSResultGroup {
     return styles;
@@ -238,13 +237,13 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
 
     return html`
       <div class="height-stats">
-        <span>Avg ${stats.simple_average ?? '—'}°</span>
+        <span>Avg ${stats.simple_average ?? '\u2014'}\u00B0</span>
         <span>
           Est. @ ${stats.reference_height_ft} ft:
-          ${stats.estimated_at_reference ?? '—'}°
+          ${stats.estimated_at_reference ?? '\u2014'}\u00B0
         </span>
         ${stats.gradient_per_ft != null
-          ? html`<span>${stats.gradient_per_ft > 0 ? '+' : ''}${stats.gradient_per_ft}°/ft</span>`
+          ? html`<span>${stats.gradient_per_ft > 0 ? '+' : ''}${stats.gradient_per_ft}\u00B0/ft</span>`
           : ''}
         <span class="height-stats-meta">${stats.point_count} height points</span>
       </div>
@@ -288,26 +287,26 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     return html`
       <div class="weather-strip">
         <div class="weather-main">
-          <span class="weather-icon">🌤</span>
+          <span class="weather-icon">\uD83C\uDF24</span>
           <div>
-            <div class="weather-temp">${weather.temperature ?? '—'}°</div>
+            <div class="weather-temp">${weather.temperature ?? '\u2014'}\u00B0</div>
             <div class="weather-label">${weather.label}</div>
           </div>
         </div>
         <div class="weather-stats">
-          ${weather.humidity != null ? html`<span>💧 ${Math.round(weather.humidity)}%</span>` : ''}
-          ${weather.feels_like != null ? html`<span>Feels ${Math.round(weather.feels_like)}°</span>` : ''}
-          ${weather.dew_point != null ? html`<span>Dew ${Math.round(weather.dew_point)}°</span>` : ''}
+          ${weather.humidity != null ? html`<span>\uD83D\uDCA7 ${Math.round(weather.humidity)}%</span>` : ''}
+          ${weather.feels_like != null ? html`<span>Feels ${Math.round(weather.feels_like)}\u00B0</span>` : ''}
+          ${weather.dew_point != null ? html`<span>Dew ${Math.round(weather.dew_point)}\u00B0</span>` : ''}
         </div>
       </div>
     `;
   }
 
-  private renderSensorRow(label: string, value: number | undefined, unit = '°'): TemplateResult {
+  private renderSensorRow(label: string, value: number | undefined, unit = '\u00B0'): TemplateResult {
     return html`
       <div class="sensor-row">
         <span class="sensor-label">${label}</span>
-        <span class="sensor-value">${value != null ? `${value}${unit}` : '—'}</span>
+        <span class="sensor-value">${value != null ? `${value}${unit}` : '\u2014'}</span>
       </div>
     `;
   }
@@ -319,9 +318,9 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       (this._config.exclude_entities?.includes(sensor.entity_id) ? '__hidden__' : '__auto__');
     const autoZone = autoAssignSensorToZone(sensor, this.zoneOptions);
     const autoLabel = sensor.area
-      ? `Auto (HA: ${sensor.area}${autoZone ? ` → ${autoZone.name}` : ''})`
+      ? `Auto (HA: ${sensor.area}${autoZone ? ` \u2192 ${autoZone.name}` : ''})`
       : autoZone
-        ? `Auto (→ ${autoZone.name})`
+        ? `Auto (\u2192 ${autoZone.name})`
         : 'Auto (by HA area)';
 
     return html`
@@ -377,7 +376,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           @change=${(e: Event) =>
             void this.updateZoneHaArea(zone.climate_entity, (e.target as HTMLSelectElement).value)}
         >
-          <option value="">—</option>
+          <option value="">\u2014</option>
           ${this.haAreas.map((a) => html`<option value=${a.area_id}>${a.name}</option>`)}
         </select>
       </label>
@@ -394,7 +393,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       <div class="room-sensor-chip">
         <div class="room-sensor-name">${sensor.name} ${this.renderHeightBadge(sensor.height_ft)}</div>
         ${this.renderAreaLabel(sensor)}
-        <div class="room-sensor-temp">${sensor.value ?? '—'}${sensor.unit ?? '°'}</div>
+        <div class="room-sensor-temp">${sensor.value ?? '\u2014'}${sensor.unit ?? '\u00B0'}</div>
         ${this.renderSensorAssign(sensor)}
         ${this.renderHeightEditor(sensor.entity_id, sensor.height_ft)}
       </div>
@@ -405,7 +404,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     return html`
       <div class="other-sensor-chip">
         <span class="other-sensor-name">${sensor.name}</span>
-        <span class="other-sensor-value">${sensor.value ?? '—'}${sensor.unit ?? ''}</span>
+        <span class="other-sensor-value">${sensor.value ?? '\u2014'}${sensor.unit ?? ''}</span>
         ${this.renderHeightBadge(sensor.height_ft)}
         ${this.renderSensorAssign(sensor)}
         ${this.renderHeightEditor(sensor.entity_id, sensor.height_ft)}
@@ -470,7 +469,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             <div class="zone-status-row">
               <span class="zone-mode ${this.modeClass(mode)}">${mode.replace('_', ' ')}</span>
               <span class="zone-action ${this.actionClass(hvacAction)}">
-                ${hvacAction === 'heating' ? '🔥 ' : hvacAction === 'cooling' ? '❄️ ' : ''}${this.actionLabel(hvacAction)}
+                ${hvacAction === 'heating' ? '\uD83D\uDD25 ' : hvacAction === 'cooling' ? '\u2744\uFE0F ' : ''}${this.actionLabel(hvacAction)}
               </span>
             </div>
             ${zone.area ? html`<div class="zone-area-label">${zone.area}</div>` : ''}
@@ -480,7 +479,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <div class="zone-temps">
             <div class="temp-target-row">
               <span class="target-label">Set to</span>
-              <span class="target-temp">${target ?? '—'}°</span>
+              <span class="target-temp">${target ?? '\u2014'}\u00B0</span>
             </div>
           </div>
         </div>
@@ -490,7 +489,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             ? html`
                 <div class="temp-cell">
                   <span class="temp-cell-label">Floor</span>
-                  <span class="temp-cell-value">${sensors.floor}°</span>
+                  <span class="temp-cell-value">${sensors.floor}\u00B0</span>
                 </div>
               `
             : ''}
@@ -498,7 +497,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             ? html`
                 <div class="temp-cell">
                   <span class="temp-cell-label">Room</span>
-                  <span class="temp-cell-value">${sensors.room}°</span>
+                  <span class="temp-cell-value">${sensors.room}\u00B0</span>
                 </div>
               `
             : ''}
@@ -506,7 +505,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             ? html`
                 <div class="temp-cell">
                   <span class="temp-cell-label">Current</span>
-                  <span class="temp-cell-value">${current}°</span>
+                  <span class="temp-cell-value">${current}\u00B0</span>
                 </div>
               `
             : ''}
@@ -514,13 +513,13 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             ? html`
                 <div class="temp-cell">
                   <span class="temp-cell-label">Thermostat</span>
-                  <span class="temp-cell-value">${current}°</span>
+                  <span class="temp-cell-value">${current}\u00B0</span>
                 </div>
               `
             : ''}
           <div class="temp-cell temp-cell-target">
             <span class="temp-cell-label">Target</span>
-            <span class="temp-cell-value">${target ?? '—'}°</span>
+            <span class="temp-cell-value">${target ?? '\u2014'}\u00B0</span>
           </div>
           ${humidity != null
             ? html`
@@ -593,9 +592,9 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                       this.adjustSetpoint(zone.climate_entity, target, -1);
                     }}
                   >
-                    −
+                    \u2212
                   </button>
-                  <span class="setpoint-display">${target ?? '—'}°</span>
+                  <span class="setpoint-display">${target ?? '\u2014'}\u00B0</span>
                   <button
                     class="step-btn"
                     @click=${(e: Event) => {
@@ -613,7 +612,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     `;
   }
 
-  /* ── Floor plan ── */
+  /* \u2500\u2500 Floor plan \u2500\u2500 */
 
   private get fpThermostats(): FloorPlanThermostat[] {
     return this._config.floor_plan?.thermostats ?? [];
@@ -724,7 +723,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                 <div class="fp-marker-dot">${isWall ? 'T' : 'F'}</div>
                 <div class="fp-marker-info">
                   <span class="fp-marker-label">${t.label}</span>
-                  ${td ? html`<span class="fp-marker-temp">${td.current ?? '—'}${td.unit || '°'}</span>` : ''}
+                  ${td ? html`<span class="fp-marker-temp">${td.current ?? '\u2014'}${td.unit || '\u00B0'}</span>` : ''}
                 </div>
               </div>
             `;
@@ -749,7 +748,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                     </option>
                   `)}
                 </select>
-                <button class="fp-tstat-del" @click=${() => this.removeFpThermostat(idx)}>✕</button>
+                <button class="fp-tstat-del" @click=${() => this.removeFpThermostat(idx)}>\u2715</button>
               </div>
             `)}
           </div>
