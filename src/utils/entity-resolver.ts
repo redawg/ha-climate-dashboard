@@ -23,6 +23,10 @@ const EXCLUDE_PATTERNS = [
   'oven',
   'cavity',
   'inverter',
+  'outdoor',
+  'outside',
+  'exterior',
+  'sensorlinx',
   ...WEATHER_PATTERNS,
 ];
 
@@ -242,13 +246,50 @@ function isExcluded(name: string, entityId: string, extra: string[] = []): boole
   return [...EXCLUDE_PATTERNS, ...extra].some((p) => haystack.includes(normalize(p)));
 }
 
-function isClimateSubSensor(name: string): boolean {
+function climateZoneSlug(climateEntityId: string): string {
+  const slug = climateEntityId.replace(/^climate\./, '');
+  const parts = slug.split('_');
+  if (parts.length >= 2 && parts.length % 2 === 0) {
+    const half = parts.length / 2;
+    const first = parts.slice(0, half).join('_');
+    const second = parts.slice(half).join('_');
+    if (first === second) return first;
+  }
+  return slug;
+}
+
+function floorHeatSensorIds(hass: HomeAssistant): Set<string> {
+  const ids = new Set<string>();
+  for (const entity of Object.values(hass.states)) {
+    if (!entity.entity_id.startsWith('climate.')) continue;
+    const zoneSlug = climateZoneSlug(entity.entity_id);
+    ids.add(`sensor.${zoneSlug}_floor_temperature`);
+    ids.add(`sensor.${zoneSlug}_room_temperature`);
+  }
+  return ids;
+}
+
+/** Floor-heat companion sensors and thermostat built-in readings — not standalone room sensors. */
+function isClimateLinkedSensor(
+  entityId: string,
+  name: string,
+  floorHeatIds: Set<string>
+): boolean {
+  if (floorHeatIds.has(entityId)) return true;
   const n = normalize(name);
-  return (
-    n.includes('floor temperature') ||
-    n.includes('room temperature') ||
-    (n.includes('current temperature') && n.includes('thermostat'))
-  );
+  return n.includes('current temperature') && n.includes('thermostat');
+}
+
+function isClimateSensorEntity(entity: HassEntity): boolean {
+  const deviceClass = entity.attributes.device_class as string | undefined;
+  if (deviceClass === 'temperature' || deviceClass === 'humidity') return true;
+  const stateClass = entity.attributes.state_class as string | undefined;
+  const unit = entity.attributes.unit_of_measurement as string | undefined;
+  if (stateClass === 'measurement' && unit) {
+    if (unit === '%') return true;
+    if (/°|deg/i.test(unit)) return true;
+  }
+  return false;
 }
 
 function isOtherSensor(name: string, entityId: string, patterns: string[]): boolean {
@@ -394,6 +435,20 @@ function resolveZoneTarget(
   );
 }
 
+function friendlyLabel(nameRaw: string, entityId: string): string {
+  let label = dedupeFriendlyName(nameRaw.replace(/\s+(temperature|humidity|temp)$/i, ''));
+  const hay = `${normalize(nameRaw)} ${normalize(entityId)}`;
+  if (hay.includes('outdoor reset')) {
+    const zoneMatch = nameRaw.match(/:\s*(.+)$/);
+    return zoneMatch ? `Outdoor reset target (${zoneMatch[1].trim()})` : 'Outdoor reset target';
+  }
+  if (hay.includes('ecobee') && hay.includes('remote')) {
+    label = label.replace(/\s*ecobee\s*/i, ' ').trim();
+    if (!/remote/i.test(label)) label = `${label} (Remote)`;
+  }
+  return label;
+}
+
 function buildAreaSensor(
   hass: HomeAssistant,
   entityId: string,
@@ -404,7 +459,7 @@ function buildAreaSensor(
   if (!entity) return undefined;
   const deviceClass = entity.attributes.device_class as string | undefined;
   const nameRaw = friendlyName(entity);
-  const name = dedupeFriendlyName(nameRaw.replace(/\s+(temperature|humidity|temp)$/i, ''));
+  const name = friendlyLabel(nameRaw, entityId);
   const unit = (entity.attributes.unit_of_measurement as string | undefined) ?? (deviceClass === 'humidity' ? '%' : '°');
   const kind = sensorKind(nameRaw, entityId, deviceClass, patterns);
   const isFloor = /floor/i.test(nameRaw) || /floor/i.test(entityId);
@@ -459,16 +514,16 @@ function collectAssignableEntityIds(
   if (config.room_sensors?.length) return [...config.room_sensors];
 
   const linked = climateLinkedSensorIds(hass, config, zones);
+  const floorHeatIds = floorHeatSensorIds(hass);
   const ids: string[] = [];
 
   for (const entity of Object.values(hass.states)) {
     if (!entity.entity_id.startsWith('sensor.')) continue;
-    const deviceClass = entity.attributes.device_class as string | undefined;
-    if (deviceClass !== 'temperature' && deviceClass !== 'humidity') continue;
+    if (!isClimateSensorEntity(entity as HassEntity)) continue;
     if (linked.has(entity.entity_id)) continue;
     const nameRaw = friendlyName(entity as HassEntity);
     if (isExcluded(nameRaw, entity.entity_id)) continue;
-    if (isClimateSubSensor(nameRaw)) continue;
+    if (isClimateLinkedSensor(entity.entity_id, nameRaw, floorHeatIds)) continue;
     ids.push(entity.entity_id);
   }
 
