@@ -27,6 +27,18 @@ const EXCLUDE_PATTERNS = [
   'outside',
   'exterior',
   'sensorlinx',
+  // UniFi / Ubiquiti network hardware (switch/AP/gateway CPU/board temps)
+  'ubiquiti',
+  'unifi',
+  'udm',
+  'usg',
+  'usw',
+  'uap',
+  'uxg',
+  'udr',
+  'unvr',
+  'poe temperature',
+  'switch temperature',
   ...WEATHER_PATTERNS,
 ];
 
