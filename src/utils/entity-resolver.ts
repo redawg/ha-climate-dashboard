@@ -42,6 +42,14 @@ const EXCLUDE_PATTERNS = [
   'unvr',
   'poe temperature',
   'switch temperature',
+  // Network device metrics (CPU, memory, uptime, signal)
+  'cpu',
+  'memory',
+  'utilization',
+  'uptime',
+  'signal level',
+  'cloud connection',
+  'access point',
   // HP printers (ink/toner levels, print status)
   'printer',
   'toner',
@@ -1006,7 +1014,7 @@ export function getWeatherData(
   if (weatherEntityId && weatherState) {
     const rawForecast = wAttr.forecast as ForecastEntry[] | undefined;
     if (rawForecast?.length) {
-      result.forecast = rawForecast.slice(0, 5);
+      result.forecast = rawForecast.slice(0, 8);
     }
   }
 
