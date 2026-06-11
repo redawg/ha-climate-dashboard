@@ -790,7 +790,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     const heaterBottom = heaterY + heaterH;
     const pipeY = heaterBottom + 14;
     const pipeH = 14;
-    const leftStubX = heaterX + heaterW * 0.34;
+    const leftStubX = heaterX + heaterW * 0.24;
     const rightStubX = heaterX + heaterW * 0.48;
 
     return html`
