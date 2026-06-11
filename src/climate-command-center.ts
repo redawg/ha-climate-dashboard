@@ -818,14 +818,21 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"
             fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="0.8"/>
           <!-- Set temp overlay aligned with display circle on heater photo -->
-          <text x="${heaterX + heaterW * 0.63}" y="${data.set_temp != null ? `${heaterY + heaterH * 0.23}` : `${heaterY + heaterH * 0.27}`}" font-size="11" text-anchor="middle"
-            fill="${data.pump_active ? '#4caf50' : '#1a1a1a'}" font-family="sans-serif" font-weight="700"
-          >${data.set_temp != null ? `${data.set_temp}°` : outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
-          ${data.set_temp != null ? html`
-            <text x="${heaterX + heaterW * 0.63}" y="${heaterY + heaterH * 0.31}" font-size="5" text-anchor="middle"
-              fill="${data.pump_active ? 'rgba(76,175,80,0.6)' : 'rgba(0,0,0,0.4)'}"
-              font-family="sans-serif" font-weight="600">SET</text>
-          ` : ''}
+          ${(() => {
+            const heating = data.heater_state === 'heating' || data.heater_state === 'heat';
+            const tempColor = heating ? '#4caf50' : '#1a1a1a';
+            const subColor = heating ? 'rgba(76,175,80,0.7)' : 'rgba(0,0,0,0.45)';
+            const cx = heaterX + heaterW * 0.65;
+            return html`
+              <text x="${cx}" y="${data.set_temp != null ? `${heaterY + heaterH * 0.23}` : `${heaterY + heaterH * 0.27}`}" font-size="12" text-anchor="middle"
+                fill="${tempColor}" font-family="sans-serif" font-weight="800"
+              >${data.set_temp != null ? `${data.set_temp}°` : outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
+              ${data.set_temp != null ? html`
+                <text x="${cx}" y="${heaterY + heaterH * 0.31}" font-size="5.5" text-anchor="middle"
+                  fill="${subColor}" font-family="sans-serif" font-weight="700">SET</text>
+              ` : ''}
+            `;
+          })()}
 
           <!-- Copper connection stubs at bottom of heater -->
           <rect x="${leftStubX - 7}" y="${heaterBottom - 2}" width="14" height="10" rx="2" fill="#b87333" stroke="#8b5a2b" stroke-width="0.5"/>

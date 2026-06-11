@@ -1186,6 +1186,7 @@ export function resolveFloorSystem(
   );
   if (waterHeater) {
     result.heater_entity = waterHeater.entity_id;
+    result.heater_state = waterHeater.state;
     const setTemp = waterHeater.attributes.temperature as number | undefined;
     if (setTemp != null) {
       result.set_temp = setTemp;

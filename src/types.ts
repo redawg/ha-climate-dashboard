@@ -235,6 +235,7 @@ export interface FloorSystemData {
   pump_entity?: string;
   power?: FloorSystemMetric;
   heater_entity?: string;
+  heater_state?: string;
   set_temp?: number;
   set_temp_unit?: string;
   extra?: Array<{ entity_id: string; name: string; value: number; unit: string }>;
