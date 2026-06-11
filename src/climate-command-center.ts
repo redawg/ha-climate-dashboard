@@ -573,26 +573,28 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     const sun = this.sunData;
     if (!sun) return null;
 
-    const lat = (this.hass.config as { latitude?: number }).latitude as number;
-    const lng = (this.hass.config as { longitude?: number }).longitude as number;
+    const isUp = sun.state === 'above_horizon';
 
-    const mapUrl = this._config.google_maps_key
-      ? `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=18&size=800x400&maptype=satellite&key=${this._config.google_maps_key}`
-      : `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${lng - 0.003},${lat - 0.0015},${lng + 0.003},${lat + 0.0015}&bboxSR=4326&size=800,400&imageSR=4326&format=png&f=image`;
+    // Use azimuth for horizontal position (E=90° on left, S=180° center, W=270° right)
+    // Facing south: east is left, west is right (standard sun path diagram)
+    const azNorm = Math.max(0, Math.min(1, (sun.azimuth - 45) / 270));
+    // Use elevation for vertical position (higher elevation = higher on arc)
+    const maxElev = 90;
+    const elevNorm = Math.max(0, sun.elevation) / maxElev;
 
+    // Arc points based on azimuth sweep (45° to 315°)
     const arcPoints: string[] = [];
     for (let i = 0; i <= 100; i++) {
       const t = i / 100;
-      const x = 5 + t * 90;
-      const y = 85 - Math.sin(t * Math.PI) * 60;
+      const x = 4 + t * 92;
+      const y = 88 - Math.sin(t * Math.PI) * 55;
       arcPoints.push(`${x},${y}`);
     }
     const arcPath = `M ${arcPoints.join(' L ')}`;
 
-    const clampedProgress = Math.max(0, Math.min(1, sun.progress));
-    const sunX = 5 + clampedProgress * 90;
-    const sunY = 85 - Math.sin(clampedProgress * Math.PI) * 60;
-    const isUp = sun.state === 'above_horizon';
+    // Sun position: x from azimuth, y from elevation
+    const sunX = 4 + azNorm * 92;
+    const sunY = isUp ? 88 - elevNorm * 55 : 95;
 
     const fmt = (d: Date) =>
       d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
@@ -601,116 +603,66 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
 
     const hrs = Math.floor(sun.remaining_minutes / 60);
     const mins = sun.remaining_minutes % 60;
-    const remaining = isUp ? `${hrs}h ${mins}m remaining` : 'Night';
-
-    const skyGradient = isUp
-      ? sun.progress < 0.15 || sun.progress > 0.85
-        ? 'url(#skyDawn)'
-        : 'url(#skyDay)'
-      : 'url(#skyNight)';
+    const remaining = isUp ? `${hrs}h ${mins}m left` : 'Night';
 
     return html`
       <div class="sun-tracker">
-        <div class="sun-tracker-bg" style="background-image: url('${mapUrl}')">
-          <svg class="sun-tracker-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="skyDay" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="rgba(25,118,210,0.5)" />
-                <stop offset="100%" stop-color="rgba(25,118,210,0.05)" />
-              </linearGradient>
-              <linearGradient id="skyDawn" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="rgba(66,66,120,0.6)" />
-                <stop offset="50%" stop-color="rgba(255,138,80,0.3)" />
-                <stop offset="100%" stop-color="rgba(255,183,77,0.1)" />
-              </linearGradient>
-              <linearGradient id="skyNight" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="rgba(20,20,60,0.8)" />
-                <stop offset="100%" stop-color="rgba(30,30,80,0.3)" />
-              </linearGradient>
-              <radialGradient id="sunGlow">
-                <stop offset="0%" stop-color="rgba(255,235,59,0.9)" />
-                <stop offset="50%" stop-color="rgba(255,193,7,0.4)" />
-                <stop offset="100%" stop-color="rgba(255,193,7,0)" />
-              </radialGradient>
-              <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="0">
-                <stop offset="0%" stop-color="rgba(255,183,77,0.6)" />
-                <stop offset="50%" stop-color="rgba(255,235,59,0.8)" />
-                <stop offset="100%" stop-color="rgba(255,138,80,0.6)" />
-              </linearGradient>
-            </defs>
+        <svg class="sun-tracker-svg" viewBox="0 0 400 55">
+          <defs>
+            <linearGradient id="skyBg" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="${isUp ? 'rgba(25,118,210,0.35)' : 'rgba(20,20,60,0.6)'}" />
+              <stop offset="100%" stop-color="${isUp ? 'rgba(255,183,77,0.08)' : 'rgba(30,30,80,0.2)'}" />
+            </linearGradient>
+            <radialGradient id="sunG">
+              <stop offset="0%" stop-color="rgba(255,235,59,0.9)" />
+              <stop offset="60%" stop-color="rgba(255,193,7,0.3)" />
+              <stop offset="100%" stop-color="rgba(255,193,7,0)" />
+            </radialGradient>
+            <linearGradient id="arcG" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="rgba(255,183,77,0.5)" />
+              <stop offset="50%" stop-color="rgba(255,235,59,0.7)" />
+              <stop offset="100%" stop-color="rgba(255,138,80,0.5)" />
+            </linearGradient>
+          </defs>
 
-            <rect x="0" y="0" width="100" height="100" fill="${skyGradient}" />
+          <rect x="0" y="0" width="400" height="55" rx="7" fill="url(#skyBg)" />
+          <line x1="16" y1="48" x2="384" y2="48" stroke="rgba(255,255,255,0.15)" stroke-width="0.5" stroke-dasharray="3,2"/>
 
-            <line
-              x1="0"
-              y1="85"
-              x2="100"
-              y2="85"
-              stroke="rgba(255,255,255,0.25)"
-              stroke-width="0.3"
-              stroke-dasharray="1,1"
-            />
+          <!-- Full arc (dashed) -->
+          <path d="${arcPath}" fill="none" stroke="rgba(255,235,59,0.15)" stroke-width="0.6" stroke-dasharray="2,1.5"
+                transform="scale(4,0.55) translate(0,0)"/>
 
-            <path
-              d="${arcPath}"
-              fill="none"
-              stroke="rgba(255,235,59,0.2)"
-              stroke-width="0.3"
-              stroke-dasharray="1,0.5"
-            />
+          <!-- Traveled arc -->
+          ${isUp ? html`
+            <path d="M ${arcPoints.slice(0, Math.round(azNorm * 100) + 1).join(' L ')}"
+                  fill="none" stroke="url(#arcG)" stroke-width="0.8"
+                  transform="scale(4,0.55) translate(0,0)"/>
+          ` : ''}
 
-            ${isUp
-              ? html`
-                  <path
-                    d="M ${arcPoints.slice(0, Math.round(clampedProgress * 100) + 1).join(' L ')}"
-                    fill="none"
-                    stroke="url(#arcGrad)"
-                    stroke-width="0.5"
-                  />
-                `
-              : ''}
+          <!-- Sun / Moon -->
+          ${isUp ? html`
+            <circle cx="${sunX * 4}" cy="${sunY * 0.55}" r="12" fill="url(#sunG)"/>
+            <circle cx="${sunX * 4}" cy="${sunY * 0.55}" r="4" fill="#FFD54F" stroke="#FFF176" stroke-width="0.5"/>
+          ` : html`
+            <circle cx="200" cy="20" r="3.5" fill="rgba(200,200,220,0.7)" stroke="rgba(255,255,255,0.2)" stroke-width="0.4"/>
+          `}
 
-            ${isUp
-              ? html`
-                  <circle cx="${sunX}" cy="${sunY}" r="6" fill="url(#sunGlow)" />
-                  <circle
-                    cx="${sunX}"
-                    cy="${sunY}"
-                    r="1.8"
-                    fill="#FFD54F"
-                    stroke="#FFF176"
-                    stroke-width="0.3"
-                  />
-                `
-              : html`
-                  <circle
-                    cx="50"
-                    cy="40"
-                    r="2"
-                    fill="rgba(200,200,220,0.8)"
-                    stroke="rgba(255,255,255,0.3)"
-                    stroke-width="0.2"
-                  />
-                `}
-          </svg>
+          <!-- E/W compass labels -->
+          <text x="10" y="46" font-size="7" fill="rgba(255,255,255,0.35)" font-family="sans-serif" font-weight="600">E</text>
+          <text x="196" y="10" font-size="7" fill="rgba(255,255,255,0.25)" font-family="sans-serif" font-weight="600" text-anchor="middle">S</text>
+          <text x="390" y="46" font-size="7" fill="rgba(255,255,255,0.35)" font-family="sans-serif" font-weight="600" text-anchor="end">W</text>
 
-          <div class="sun-tracker-labels">
-            <div class="sun-rise-label">
-              <span class="sun-label-icon">↗</span>
-              <span class="sun-label-time">${riseTime}</span>
-              <span class="sun-label-text">Sunrise</span>
-            </div>
-            <div class="sun-info-center">
-              <span class="sun-elevation">${Math.round(sun.elevation)}°</span>
-              <span class="sun-remaining">${remaining}</span>
-            </div>
-            <div class="sun-set-label">
-              <span class="sun-label-icon">↘</span>
-              <span class="sun-label-time">${setTime}</span>
-              <span class="sun-label-text">Sunset</span>
-            </div>
-          </div>
-        </div>
+          <!-- Sunrise label -->
+          <text x="22" y="13" font-size="8" fill="#FFB74D" font-family="sans-serif" font-weight="600">↗ ${riseTime}</text>
+
+          <!-- Sunset label -->
+          <text x="378" y="13" font-size="8" fill="#FF8A50" font-family="sans-serif" font-weight="600" text-anchor="end">${setTime} ↘</text>
+
+          <!-- Center info -->
+          <text x="200" y="46" font-size="8" fill="rgba(255,255,255,0.6)" font-family="sans-serif" text-anchor="middle">
+            ${isUp ? `${Math.round(sun.elevation)}° · ${remaining}` : 'Night'}
+          </text>
+        </svg>
       </div>
     `;
   }

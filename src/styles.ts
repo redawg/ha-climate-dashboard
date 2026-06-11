@@ -1234,83 +1234,15 @@ export const styles: CSSResultGroup = css`
   /* ── Sun Tracker ── */
   .sun-tracker {
     margin-bottom: 18px;
-    border-radius: 14px;
+    border-radius: 10px;
     overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-  }
-
-  .sun-tracker-bg {
-    position: relative;
-    width: 100%;
-    height: 200px;
-    background-size: cover;
-    background-position: center;
-    background-color: #1a1a2e;
+    border: 1px solid rgba(255, 255, 255, 0.08);
   }
 
   .sun-tracker-svg {
-    position: absolute;
-    top: 0;
-    left: 0;
+    display: block;
     width: 100%;
-    height: 100%;
-  }
-
-  .sun-tracker-labels {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    padding: 12px 16px;
-    background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
-  }
-
-  .sun-rise-label,
-  .sun-set-label {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1px;
-  }
-
-  .sun-label-icon {
-    font-size: 1rem;
-    color: #ffb74d;
-  }
-
-  .sun-label-time {
-    font-size: 0.85rem;
-    font-weight: 600;
-    color: white;
-  }
-
-  .sun-label-text {
-    font-size: 0.6rem;
-    color: rgba(255, 255, 255, 0.6);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-  }
-
-  .sun-info-center {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 2px;
-  }
-
-  .sun-elevation {
-    font-size: 1.4rem;
-    font-weight: 700;
-    color: white;
-  }
-
-  .sun-remaining {
-    font-size: 0.72rem;
-    color: rgba(255, 255, 255, 0.7);
+    height: auto;
   }
 
   @media (max-width: 600px) {
@@ -1343,8 +1275,5 @@ export const styles: CSSResultGroup = css`
       flex-direction: column;
     }
 
-    .sun-tracker-bg {
-      height: 160px;
-    }
   }
 `;
