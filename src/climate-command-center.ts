@@ -36,7 +36,7 @@ import {
 } from './utils/entity-resolver';
 import { getEntityIndex } from './utils/entity-index';
 import { computeZoneHeightStats } from './utils/height-averages';
-import { resolveWwsdState } from './utils/wwsd';
+import { resolveOutdoorResetTarget, resolveWwsdState, isOutdoorResetZone } from './utils/wwsd';
 import { FLOORPLAN_IMAGE } from './floorplan-image';
 import { DEFAULT_HEATER_IMAGE } from './heater-image';
 
@@ -1505,27 +1505,17 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   }
 
   private isWwsdAffectedZone(zone: ClimateZone): boolean {
-    if (!this.wwsdState.active) return false;
-
-    const hasFloorLoop =
-      zone.sensors.floor != null ||
-      (zone.valves?.length ?? 0) > 0 ||
-      zone.kind === 'floor_heat';
-    if (!hasFloorLoop) return false;
-
-    const standaloneThermostat =
-      /thermostat/i.test(zone.name) &&
-      zone.sensors.floor == null &&
-      (zone.valves?.length ?? 0) === 0;
-
-    return !standaloneThermostat;
+    if (!this.wwsdState.active || !this._hass) return false;
+    return isOutdoorResetZone(this._hass, zone.climate_entity);
   }
 
   private zoneDisplayTemp(
     current: number | undefined,
-    sensors: ZoneSensors
+    sensors: ZoneSensors,
+    preferFloor = false
   ): number | undefined {
-    return sensors.room ?? current ?? sensors.floor;
+    if (preferFloor && sensors.floor != null) return sensors.floor;
+    return sensors.floor ?? sensors.room ?? current;
   }
 
   private renderWwsdDial(
@@ -1593,7 +1583,10 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
         ? allModes.filter((m) => m === 'heat' || m === 'off')
         : allModes;
     const wwsdActive = this.isWwsdAffectedZone(zone);
-    const displayCurrent = this.zoneDisplayTemp(current, sensors);
+    const displayCurrent = this.zoneDisplayTemp(current, sensors, wwsdActive);
+    const wwsdTarget = wwsdActive
+      ? resolveOutdoorResetTarget(this.hass, zone.climate_entity) ?? target
+      : target;
 
     return html`
       <div class="zone-card ${expanded ? 'expanded' : ''} ${zone.kind} ${this.modeClass(mode)} ${this.actionClass(hvacAction)} ${wwsdActive ? 'wwsd-active' : ''}">
@@ -1634,7 +1627,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
         </div>
 
         ${wwsdActive
-          ? this.renderWwsdDial(displayCurrent, target)
+          ? this.renderWwsdDial(displayCurrent, wwsdTarget)
           : html`
               <div class="zone-temp-grid">
                 ${sensors.floor != null

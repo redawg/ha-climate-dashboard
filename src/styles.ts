@@ -613,6 +613,22 @@ export const styles: CSSResultGroup = css`
     border-radius: 0 0 12px 12px;
   }
 
+  .zone-card.wwsd-active,
+  .zone-card.wwsd-active.thermostat,
+  .zone-card.wwsd-active.mode-cool,
+  .zone-card.wwsd-active.mode-heat,
+  .zone-card.wwsd-active.action-heating,
+  .zone-card.wwsd-active.action-cooling {
+    border-left-color: #ff9800;
+    border-left-width: 3px;
+    background: linear-gradient(180deg, rgba(255, 152, 0, 0.06), transparent 55%);
+  }
+
+  .zone-card.wwsd-active.action-heating::after,
+  .zone-card.wwsd-active.floor_heat.action-heating::after {
+    display: none;
+  }
+
   @keyframes flowAccent {
     from { background-position: 200% 0; }
     to { background-position: 0 0; }

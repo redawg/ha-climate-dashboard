@@ -87,6 +87,39 @@ function isEntityActive(hass: HomeAssistant, entityId: string): boolean | undefi
   return undefined;
 }
 
+export function climateZoneSlug(climateEntityId: string): string {
+  const slug = climateEntityId.replace(/^climate\./, '');
+  const parts = slug.split('_');
+  if (parts.length >= 2 && parts.length % 2 === 0) {
+    const half = parts.length / 2;
+    const first = parts.slice(0, half).join('_');
+    const second = parts.slice(half).join('_');
+    if (first === second) return first;
+  }
+  return slug;
+}
+
+export function outdoorResetTargetEntityId(
+  hass: HomeAssistant,
+  climateEntity: string
+): string | undefined {
+  const id = `sensor.sensorlinx_outdoor_reset_target_${climateZoneSlug(climateEntity)}`;
+  return hass.states[id] ? id : undefined;
+}
+
+export function resolveOutdoorResetTarget(
+  hass: HomeAssistant,
+  climateEntity: string
+): number | undefined {
+  const entityId = outdoorResetTargetEntityId(hass, climateEntity);
+  if (!entityId) return undefined;
+  return parseNumericState(hass.states[entityId]?.state);
+}
+
+export function isOutdoorResetZone(hass: HomeAssistant, climateEntity: string): boolean {
+  return outdoorResetTargetEntityId(hass, climateEntity) != null;
+}
+
 export function listWwsdEntityIds(
   hass: HomeAssistant,
   config: ClimateCommandCenterConfig
@@ -101,6 +134,12 @@ export function listWwsdEntityIds(
 
   if (config.wwsd_outdoor_temp_entity) ids.add(config.wwsd_outdoor_temp_entity);
   if (config.weather_temperature) ids.add(config.weather_temperature);
+
+  for (const entityId of Object.keys(hass.states)) {
+    if (entityId.startsWith('sensor.sensorlinx_outdoor_reset_target_')) {
+      ids.add(entityId);
+    }
+  }
 
   return [...ids];
 }
