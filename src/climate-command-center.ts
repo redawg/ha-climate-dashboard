@@ -827,31 +827,31 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
               font-family="sans-serif" letter-spacing="0.4">WATER HEATER</text>
           ` : ''}
 
-          <!-- Copper connection stubs at bottom -->
+          <!-- Copper connection stubs at bottom of heater -->
           <rect x="${leftStubX - 7}" y="${heaterBottom - 2}" width="14" height="10" rx="2" fill="#b87333" stroke="#8b5a2b" stroke-width="0.5"/>
           <rect x="${rightStubX - 7}" y="${heaterBottom - 2}" width="14" height="10" rx="2" fill="#b87333" stroke="#8b5a2b" stroke-width="0.5"/>
 
-          <!-- Vertical drops — glass pipe sections -->
-          <rect x="${leftStubX - 5}" y="${heaterBottom + 6}" width="10" height="${pipeY - heaterBottom - 4}" rx="5" fill="rgba(255,255,255,0.06)" stroke="rgba(200,200,210,0.35)" stroke-width="0.8"/>
-          <rect x="${leftStubX - 3}" y="${heaterBottom + 8}" width="6" height="${pipeY - heaterBottom - 8}" rx="3" fill="url(#outletFlow)"/>
-          <rect x="${rightStubX - 5}" y="${heaterBottom + 6}" width="10" height="${pipeY - heaterBottom - 4}" rx="5" fill="rgba(255,255,255,0.06)" stroke="rgba(200,200,210,0.35)" stroke-width="0.8"/>
-          <rect x="${rightStubX - 3}" y="${heaterBottom + 8}" width="6" height="${pipeY - heaterBottom - 8}" rx="3" fill="url(#inletFlow)"/>
+          <!-- Outlet pipe (hot supply) — curves up from horizontal into heater stub -->
+          <path d="M 0,${pipeY + pipeH / 2} L ${leftStubX - 22},${pipeY + pipeH / 2} Q ${leftStubX},${pipeY + pipeH / 2} ${leftStubX},${pipeY - 6} L ${leftStubX},${heaterBottom + 7}"
+            fill="none" stroke="rgba(200,200,210,0.35)" stroke-width="${pipeH}" stroke-linecap="round"/>
+          <path d="M 0,${pipeY + pipeH / 2} L ${leftStubX - 22},${pipeY + pipeH / 2} Q ${leftStubX},${pipeY + pipeH / 2} ${leftStubX},${pipeY - 6} L ${leftStubX},${heaterBottom + 7}"
+            fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="${pipeH - 2}" stroke-linecap="round"/>
+          <path d="M 3,${pipeY + pipeH / 2} L ${leftStubX - 22},${pipeY + pipeH / 2} Q ${leftStubX},${pipeY + pipeH / 2} ${leftStubX},${pipeY - 6} L ${leftStubX},${heaterBottom + 8}"
+            fill="none" stroke="url(#outletFlow)" stroke-width="${pipeH - 4}" stroke-linecap="round"/>
+          <!-- Glass highlight on horizontal section -->
+          <path d="M 6,${pipeY + 2} L ${leftStubX - 26},${pipeY + 2}"
+            fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2" stroke-linecap="round"/>
 
-          <!-- Outlet pipe (hot supply) — transparent glass pipe with CFD flow, extends LEFT -->
-          <rect x="0" y="${pipeY}" width="${leftStubX + 5}" height="${pipeH}" rx="7"
-            fill="rgba(255,255,255,0.06)" stroke="rgba(200,200,210,0.35)" stroke-width="0.8"/>
-          <rect x="3" y="${pipeY + 2}" width="${leftStubX - 1}" height="${pipeH - 4}" rx="5"
-            fill="url(#outletFlow)"/>
-          <rect x="6" y="${pipeY + 1}" width="${leftStubX - 6}" height="2.5" rx="1"
-            fill="rgba(255,255,255,0.12)"/>
-
-          <!-- Inlet pipe (cold return) — transparent glass pipe with CFD flow, extends RIGHT -->
-          <rect x="${rightStubX - 5}" y="${pipeY}" width="${400 - rightStubX + 5}" height="${pipeH}" rx="7"
-            fill="rgba(255,255,255,0.06)" stroke="rgba(200,200,210,0.35)" stroke-width="0.8"/>
-          <rect x="${rightStubX - 1}" y="${pipeY + 2}" width="${400 - rightStubX - 3}" height="${pipeH - 4}" rx="5"
-            fill="url(#inletFlow)"/>
-          <rect x="${rightStubX + 2}" y="${pipeY + 1}" width="${400 - rightStubX - 8}" height="2.5" rx="1"
-            fill="rgba(255,255,255,0.12)"/>
+          <!-- Inlet pipe (cold return) — curves up from horizontal into heater stub -->
+          <path d="M 400,${pipeY + pipeH / 2} L ${rightStubX + 22},${pipeY + pipeH / 2} Q ${rightStubX},${pipeY + pipeH / 2} ${rightStubX},${pipeY - 6} L ${rightStubX},${heaterBottom + 7}"
+            fill="none" stroke="rgba(200,200,210,0.35)" stroke-width="${pipeH}" stroke-linecap="round"/>
+          <path d="M 400,${pipeY + pipeH / 2} L ${rightStubX + 22},${pipeY + pipeH / 2} Q ${rightStubX},${pipeY + pipeH / 2} ${rightStubX},${pipeY - 6} L ${rightStubX},${heaterBottom + 7}"
+            fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="${pipeH - 2}" stroke-linecap="round"/>
+          <path d="M 397,${pipeY + pipeH / 2} L ${rightStubX + 22},${pipeY + pipeH / 2} Q ${rightStubX},${pipeY + pipeH / 2} ${rightStubX},${pipeY - 6} L ${rightStubX},${heaterBottom + 8}"
+            fill="none" stroke="url(#inletFlow)" stroke-width="${pipeH - 4}" stroke-linecap="round"/>
+          <!-- Glass highlight on horizontal section -->
+          <path d="M ${rightStubX + 26},${pipeY + 2} L 394,${pipeY + 2}"
+            fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2" stroke-linecap="round"/>
 
           <!-- Hot output temp label (left) -->
           <text x="42" y="${pipeY - 4}" font-size="11" text-anchor="middle" fill="${outletColor}" font-family="sans-serif" font-weight="700">${outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
