@@ -717,23 +717,23 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             <!-- CFD-style flow: dense arrow-like streaks for inlet (cold return, flows LEFT to RIGHT) -->
             <pattern id="inletFlow" x="0" y="0" width="28" height="16" patternUnits="userSpaceOnUse">
               <rect width="28" height="16" fill="${inletColor}" opacity="0.2"/>
-              <polygon points="0,8 10,5 10,11" fill="${inletColor}" opacity="0.9">
-                <animate attributeName="points" values="0,8 10,5 10,11;28,8 38,5 38,11" dur="1.1s" repeatCount="indefinite"/>
+              <polygon points="28,8 18,5 18,11" fill="${inletColor}" opacity="0.9">
+                <animate attributeName="points" values="28,8 18,5 18,11;0,8 -10,5 -10,11" dur="1.1s" repeatCount="indefinite"/>
               </polygon>
-              <polygon points="14,8 22,6 22,10" fill="${inletColor}" opacity="0.75">
-                <animate attributeName="points" values="14,8 22,6 22,10;42,8 50,6 50,10" dur="1.1s" repeatCount="indefinite"/>
+              <polygon points="14,8 6,6 6,10" fill="${inletColor}" opacity="0.75">
+                <animate attributeName="points" values="14,8 6,6 6,10;-14,8 -22,6 -22,10" dur="1.1s" repeatCount="indefinite"/>
               </polygon>
-              <polygon points="3,3 9,1.5 9,4.5" fill="${inletColor}" opacity="0.5">
-                <animate attributeName="points" values="3,3 9,1.5 9,4.5;31,3 37,1.5 37,4.5" dur="1.4s" repeatCount="indefinite"/>
+              <polygon points="25,3 19,1.5 19,4.5" fill="${inletColor}" opacity="0.5">
+                <animate attributeName="points" values="25,3 19,1.5 19,4.5;-3,3 -9,1.5 -9,4.5" dur="1.4s" repeatCount="indefinite"/>
               </polygon>
-              <polygon points="18,13 24,11.5 24,14.5" fill="${inletColor}" opacity="0.5">
-                <animate attributeName="points" values="18,13 24,11.5 24,14.5;46,13 52,11.5 52,14.5" dur="1.4s" repeatCount="indefinite"/>
+              <polygon points="10,13 4,11.5 4,14.5" fill="${inletColor}" opacity="0.5">
+                <animate attributeName="points" values="10,13 4,11.5 4,14.5;-18,13 -24,11.5 -24,14.5" dur="1.4s" repeatCount="indefinite"/>
               </polygon>
-              <circle r="1.8" cx="7" cy="5" fill="${inletColor}" opacity="0.6">
-                <animate attributeName="cx" from="-4" to="24" dur="1.1s" repeatCount="indefinite"/>
+              <circle r="1.8" cx="22" cy="5" fill="${inletColor}" opacity="0.6">
+                <animate attributeName="cx" from="32" to="4" dur="1.1s" repeatCount="indefinite"/>
               </circle>
-              <circle r="1.5" cx="20" cy="12" fill="${inletColor}" opacity="0.55">
-                <animate attributeName="cx" from="-2" to="26" dur="1.3s" repeatCount="indefinite"/>
+              <circle r="1.5" cx="8" cy="12" fill="${inletColor}" opacity="0.55">
+                <animate attributeName="cx" from="30" to="2" dur="1.3s" repeatCount="indefinite"/>
               </circle>
             </pattern>
             <pattern id="outletFlow" x="0" y="0" width="28" height="16" patternUnits="userSpaceOnUse">
