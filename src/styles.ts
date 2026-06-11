@@ -599,16 +599,27 @@ export const styles: CSSResultGroup = css`
     min-width: 72px;
   }
 
-  .floor-system-field select {
+  .floor-system-field select,
+  .floor-system-field input[type='text'] {
     flex: 1;
     min-width: 0;
     max-width: 100%;
-    padding: 2px 4px;
+    padding: 3px 6px;
     border-radius: 4px;
-    border: 1px solid rgba(255, 255, 255, 0.12);
-    background: rgba(0, 0, 0, 0.2);
-    color: var(--primary-text-color);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: var(--card-background-color, rgba(0, 0, 0, 0.2));
+    color: var(--primary-text-color, #fff);
     font-size: 0.68rem;
+    -webkit-appearance: auto;
+    appearance: auto;
+  }
+  .floor-system-field select option {
+    background: var(--card-background-color, #1e1e2e);
+    color: var(--primary-text-color, #fff);
+  }
+
+  .floor-system-field-text {
+    grid-column: 1 / -1;
   }
 
   .floor-system-disable {

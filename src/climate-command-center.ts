@@ -255,6 +255,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       current.return_temp ||
       current.flow_rate ||
       current.pump_status ||
+      current.heater_image ||
       (current.extra_sensors?.length ?? 0) > 0;
 
     const next = {
@@ -269,39 +270,42 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     field: 'supply_temp' | 'return_temp' | 'flow_rate' | 'pump_status'
   ): string[] {
     const states = Object.values(this.hass.states);
-    const matchId = (id: string, terms: string[]) => terms.some((t) => id.includes(t));
+    const match = (hay: string, terms: string[]) => terms.some((t) => hay.includes(t));
+    const nameAndId = (e: { entity_id: string; attributes: Record<string, unknown> }) => {
+      const friendly = ((e.attributes.friendly_name as string) ?? '').toLowerCase();
+      return `${e.entity_id.toLowerCase()} ${friendly}`;
+    };
 
     switch (field) {
       case 'supply_temp':
+      case 'return_temp': {
+        const hints =
+          field === 'supply_temp'
+            ? ['supply', 'hot', 'outlet', 'output']
+            : ['return', 'cold', 'inlet', 'input'];
         return states
           .filter((e) => {
             if (!e.entity_id.startsWith('sensor.')) return false;
-            const id = e.entity_id.toLowerCase();
-            return (
+            const hay = nameAndId(e);
+            const isTemp =
               e.attributes.device_class === 'temperature' ||
-              matchId(id, ['supply', 'hot', 'outlet'])
-            );
+              (e.attributes.unit_of_measurement as string | undefined) === '°F' ||
+              (e.attributes.unit_of_measurement as string | undefined) === '°C' ||
+              hay.includes('temperature') || hay.includes('temp');
+            if (!isTemp) return false;
+            if (match(hay, hints)) return true;
+            if (hay.includes('water') && hay.includes('heater')) return true;
+            return false;
           })
           .map((e) => e.entity_id)
           .sort();
-      case 'return_temp':
-        return states
-          .filter((e) => {
-            if (!e.entity_id.startsWith('sensor.')) return false;
-            const id = e.entity_id.toLowerCase();
-            return (
-              e.attributes.device_class === 'temperature' ||
-              matchId(id, ['return', 'cold', 'inlet'])
-            );
-          })
-          .map((e) => e.entity_id)
-          .sort();
+      }
       case 'flow_rate':
         return states
           .filter((e) => {
             if (!e.entity_id.startsWith('sensor.')) return false;
-            const id = e.entity_id.toLowerCase();
-            return matchId(id, ['flow', 'gpm', 'gallons']);
+            const hay = nameAndId(e);
+            return match(hay, ['flow', 'gpm', 'gallons', 'flow_rate']);
           })
           .map((e) => e.entity_id)
           .sort();
@@ -309,11 +313,19 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
         return states
           .filter((e) => {
             const id = e.entity_id.toLowerCase();
-            if (!id.startsWith('switch.') && !id.startsWith('binary_sensor.')) return false;
-            return matchId(id, ['pump', 'boiler', 'circulator']);
+            if (
+              !id.startsWith('switch.') &&
+              !id.startsWith('binary_sensor.') &&
+              !id.startsWith('input_boolean.')
+            )
+              return false;
+            const hay = nameAndId(e);
+            return match(hay, ['pump', 'boiler', 'circulator', 'heater', 'water_heater']);
           })
           .map((e) => e.entity_id)
           .sort();
+      default:
+        return [];
     }
   }
 
@@ -377,6 +389,22 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           ${this.renderFloorSystemFieldSelect('Return Temp', 'return_temp')}
           ${this.renderFloorSystemFieldSelect('Flow Rate', 'flow_rate')}
           ${this.renderFloorSystemFieldSelect('Pump Status', 'pump_status')}
+          <label class="floor-system-field floor-system-field-text">
+            <span class="floor-system-field-label">Heater Image URL</span>
+            <input
+              type="text"
+              .value=${this._config.floor_system !== false
+                ? (this._config.floor_system?.heater_image ?? '')
+                : ''}
+              placeholder="https://... or /local/heater.png"
+              ?disabled=${disabled}
+              @input=${(e: Event) =>
+                this.updateFloorSystem(
+                  'heater_image',
+                  (e.target as HTMLInputElement).value
+                )}
+            />
+          </label>
         </div>
         <label class="floor-system-disable">
           <input
@@ -665,12 +693,42 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     const outletColor = this.tempToColor(outletTemp);
     const inletUnit = data.return_temp?.unit ?? '°';
     const outletUnit = data.supply_temp?.unit ?? '°';
+    const fs = this._config.floor_system;
+    const heaterImage =
+      fs !== false && fs?.heater_image?.trim() ? fs.heater_image.trim() : undefined;
+
+    const heaterX = 100;
+    const heaterY = 38;
+    const heaterW = 200;
+    const heaterH = 92;
+    const heaterBottom = heaterY + heaterH;
+    const pipeY = 138;
+    const pipeH = 14;
+    const leftStubX = 125;
+    const rightStubX = 275;
 
     return html`
       <div class="floor-system tankless-visual">
-        <svg class="tankless-svg" viewBox="0 0 400 160" preserveAspectRatio="xMidYMid meet">
+        <svg class="tankless-svg" viewBox="0 0 400 180" preserveAspectRatio="xMidYMid meet">
           <defs>
-            <!-- Animated flow particles for inlet (cold) pipe -->
+            <linearGradient id="heaterBodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#f8f8f8"/>
+              <stop offset="45%" stop-color="#ececec"/>
+              <stop offset="100%" stop-color="#d4d4d4"/>
+            </linearGradient>
+            <linearGradient id="heaterEdgeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+              <stop offset="0%" stop-color="rgba(255,255,255,0.5)"/>
+              <stop offset="100%" stop-color="rgba(0,0,0,0.08)"/>
+            </linearGradient>
+            <radialGradient id="heatGlow" cx="50%" cy="70%" r="60%">
+              <stop offset="0%" stop-color="#ff7043" stop-opacity="0.45"/>
+              <stop offset="70%" stop-color="#ff9800" stop-opacity="0.15"/>
+              <stop offset="100%" stop-color="#ff9800" stop-opacity="0"/>
+            </radialGradient>
+            <clipPath id="heaterClip">
+              <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"/>
+            </clipPath>
+            <!-- Animated flow particles for inlet (cold return) pipe — flows right into unit -->
             <pattern id="inletFlow" x="0" y="0" width="20" height="10" patternUnits="userSpaceOnUse">
               <circle r="2.5" cx="5" cy="5" fill="${inletColor}" opacity="0.7">
                 <animate attributeName="cx" from="-5" to="25" dur="1.2s" repeatCount="indefinite"/>
@@ -679,74 +737,152 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                 <animate attributeName="cx" from="5" to="35" dur="1.2s" repeatCount="indefinite"/>
               </circle>
             </pattern>
-            <!-- Animated flow particles for outlet (hot) pipe -->
+            <!-- Animated flow particles for outlet (hot supply) pipe — flows left out of unit -->
             <pattern id="outletFlow" x="0" y="0" width="20" height="10" patternUnits="userSpaceOnUse">
               <circle r="2.5" cx="5" cy="5" fill="${outletColor}" opacity="0.7">
-                <animate attributeName="cx" from="-5" to="25" dur="0.9s" repeatCount="indefinite"/>
+                <animate attributeName="cx" from="25" to="-5" dur="0.9s" repeatCount="indefinite"/>
               </circle>
               <circle r="1.8" cx="15" cy="5" fill="${outletColor}" opacity="0.5">
-                <animate attributeName="cx" from="5" to="35" dur="0.9s" repeatCount="indefinite"/>
+                <animate attributeName="cx" from="35" to="5" dur="0.9s" repeatCount="indefinite"/>
               </circle>
             </pattern>
           </defs>
 
-          <!-- Inlet pipe (cold, bottom) -->
-          <rect x="0" y="105" width="130" height="14" rx="7" fill="rgba(100,181,246,0.15)" stroke="${inletColor}" stroke-width="1.5"/>
-          <rect x="5" y="107" width="120" height="10" rx="5" fill="url(#inletFlow)"/>
-
-          <!-- Outlet pipe (hot, top) -->
-          <rect x="270" y="45" width="130" height="14" rx="7" fill="rgba(255,183,77,0.15)" stroke="${outletColor}" stroke-width="1.5"/>
-          <rect x="275" y="47" width="120" height="10" rx="5" fill="url(#outletFlow)"/>
-
-          <!-- Tankless water heater body -->
-          <rect x="130" y="20" width="140" height="120" rx="10" fill="rgba(60,60,80,0.9)" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
-
-          <!-- Heater inner panel -->
-          <rect x="145" y="35" width="110" height="50" rx="5" fill="rgba(30,30,45,0.8)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
-
-          <!-- Flame icons inside heater -->
-          <text x="175" y="68" font-size="22" text-anchor="middle" fill="#ff7043" opacity="0.9">🔥</text>
-          <text x="200" y="63" font-size="28" text-anchor="middle" fill="#ff9800">🔥</text>
-          <text x="225" y="68" font-size="22" text-anchor="middle" fill="#ff7043" opacity="0.9">🔥</text>
-
-          <!-- Heater label -->
-          <text x="200" y="108" font-size="10" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="sans-serif" font-weight="600" letter-spacing="0.5">TANKLESS</text>
-          <text x="200" y="122" font-size="8" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="sans-serif" letter-spacing="0.3">WATER HEATER</text>
-
-          <!-- Connection pipes from unit to main pipes -->
-          <!-- Inlet connection (bottom-left of heater to inlet pipe) -->
-          <path d="M 155 140 L 155 112 Q 130 112 130 112" fill="none" stroke="${inletColor}" stroke-width="2" opacity="0.6"/>
-          <!-- Outlet connection (top-right of heater to outlet pipe) -->
-          <path d="M 245 40 L 245 52 Q 270 52 270 52" fill="none" stroke="${outletColor}" stroke-width="2" opacity="0.6"/>
-
-          <!-- Inlet temp label -->
-          <text x="60" y="100" font-size="11" text-anchor="middle" fill="${inletColor}" font-family="sans-serif" font-weight="700">${inletTemp != null ? `${inletTemp}${inletUnit}` : '—'}</text>
-          <text x="60" y="133" font-size="8" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="sans-serif" font-weight="600">INLET</text>
-
-          <!-- Outlet temp label -->
-          <text x="340" y="40" font-size="11" text-anchor="middle" fill="${outletColor}" font-family="sans-serif" font-weight="700">${outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
-          <text x="340" y="73" font-size="8" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="sans-serif" font-weight="600">OUTLET</text>
-
-          <!-- Delta T badge -->
-          ${data.delta_t != null
-            ? html`
-                <rect x="170" y="132" width="60" height="18" rx="9" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="0.8"/>
-                <text x="200" y="145" font-size="9" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="sans-serif" font-weight="600">ΔT ${data.delta_t}°</text>
-              `
-            : ''}
-
-          <!-- Flow rate (if available) -->
+          <!-- Flow rate above heater -->
           ${data.flow_rate
             ? html`
-                <text x="200" y="15" font-size="8" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="sans-serif">Flow: ${data.flow_rate.value} ${data.flow_rate.unit}</text>
+                <text x="200" y="22" font-size="8" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="sans-serif">Flow: ${data.flow_rate.value} ${data.flow_rate.unit}</text>
               `
             : ''}
 
-          <!-- Pump status (if available) -->
+          <!-- Pump status indicator -->
           ${data.pump_entity != null
             ? html`
-                <circle cx="385" cy="52" r="5" fill="${data.pump_active ? '#4caf50' : '#616161'}"/>
-                <text x="385" y="70" font-size="6" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="sans-serif">PUMP</text>
+                <circle cx="385" cy="18" r="5" fill="${data.pump_active ? '#4caf50' : '#616161'}"/>
+                <text x="385" y="32" font-size="6" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="sans-serif">PUMP</text>
+              `
+            : ''}
+
+          <!-- Unit shadow -->
+          <ellipse cx="200" cy="${heaterBottom + 3}" rx="92" ry="4" fill="rgba(0,0,0,0.28)"/>
+
+          <!-- Heater unit: custom image or default illustration -->
+          ${heaterImage
+            ? html`
+                <image
+                  href="${heaterImage}"
+                  x="${heaterX}"
+                  y="${heaterY}"
+                  width="${heaterW}"
+                  height="${heaterH}"
+                  clip-path="url(#heaterClip)"
+                  preserveAspectRatio="xMidYMid meet"
+                />
+                <rect
+                  x="${heaterX}"
+                  y="${heaterY}"
+                  width="${heaterW}"
+                  height="${heaterH}"
+                  rx="8"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.15)"
+                  stroke-width="1"
+                />
+              `
+            : html`
+                <rect
+                  x="${heaterX}"
+                  y="${heaterY}"
+                  width="${heaterW}"
+                  height="${heaterH}"
+                  rx="8"
+                  fill="url(#heaterBodyGrad)"
+                  stroke="#b8b8b8"
+                  stroke-width="1"
+                />
+                <rect
+                  x="${heaterX}"
+                  y="${heaterY}"
+                  width="${heaterW}"
+                  height="${heaterH}"
+                  rx="8"
+                  fill="url(#heaterEdgeGrad)"
+                  opacity="0.35"
+                />
+                ${data.pump_active
+                  ? html`
+                      <rect
+                        x="${heaterX + 8}"
+                        y="${heaterY + 20}"
+                        width="${heaterW - 16}"
+                        height="${heaterH - 32}"
+                        rx="6"
+                        fill="url(#heatGlow)"
+                      />
+                    `
+                  : ''}
+                <!-- Display cutout top-right -->
+                <circle cx="265" cy="58" r="15" fill="#1e1e2e" stroke="#c0c0c0" stroke-width="1"/>
+                <circle cx="265" cy="58" r="12" fill="#0d0d18" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
+                <text
+                  x="265"
+                  y="61"
+                  font-size="9"
+                  text-anchor="middle"
+                  fill="#ffb74d"
+                  font-family="sans-serif"
+                  font-weight="700"
+                >${outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
+                <text
+                  x="200"
+                  y="88"
+                  font-size="6.5"
+                  text-anchor="middle"
+                  fill="rgba(0,0,0,0.22)"
+                  font-family="sans-serif"
+                  font-weight="600"
+                  letter-spacing="0.6"
+                >TANKLESS</text>
+                <text
+                  x="200"
+                  y="98"
+                  font-size="5.5"
+                  text-anchor="middle"
+                  fill="rgba(0,0,0,0.18)"
+                  font-family="sans-serif"
+                  letter-spacing="0.4"
+                >WATER HEATER</text>
+              `}
+
+          <!-- Copper connection stubs at bottom -->
+          <rect x="${leftStubX - 7}" y="${heaterBottom - 2}" width="14" height="10" rx="2" fill="#b87333" stroke="#8b5a2b" stroke-width="0.5"/>
+          <rect x="${rightStubX - 7}" y="${heaterBottom - 2}" width="14" height="10" rx="2" fill="#b87333" stroke="#8b5a2b" stroke-width="0.5"/>
+
+          <!-- Vertical drops to horizontal pipes -->
+          <path d="M ${leftStubX} ${heaterBottom + 8} L ${leftStubX} ${pipeY + pipeH / 2}" fill="none" stroke="${outletColor}" stroke-width="2" opacity="0.65"/>
+          <path d="M ${rightStubX} ${heaterBottom + 8} L ${rightStubX} ${pipeY + pipeH / 2}" fill="none" stroke="${inletColor}" stroke-width="2" opacity="0.65"/>
+
+          <!-- Outlet pipe (hot supply) — extends LEFT from bottom-left -->
+          <rect x="0" y="${pipeY}" width="${leftStubX}" height="${pipeH}" rx="7" fill="rgba(255,183,77,0.12)" stroke="${outletColor}" stroke-width="1.5"/>
+          <rect x="4" y="${pipeY + 2}" width="${leftStubX - 8}" height="${pipeH - 4}" rx="5" fill="url(#outletFlow)"/>
+
+          <!-- Inlet pipe (cold return) — extends RIGHT from bottom-right -->
+          <rect x="${rightStubX}" y="${pipeY}" width="${400 - rightStubX}" height="${pipeH}" rx="7" fill="rgba(100,181,246,0.12)" stroke="${inletColor}" stroke-width="1.5"/>
+          <rect x="${rightStubX + 4}" y="${pipeY + 2}" width="${400 - rightStubX - 8}" height="${pipeH - 4}" rx="5" fill="url(#inletFlow)"/>
+
+          <!-- Hot output temp label (left) -->
+          <text x="42" y="${pipeY - 4}" font-size="11" text-anchor="middle" fill="${outletColor}" font-family="sans-serif" font-weight="700">${outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
+          <text x="42" y="${pipeY + pipeH + 12}" font-size="7" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-family="sans-serif" font-weight="600">HOT OUTPUT</text>
+
+          <!-- Cold input temp label (right) -->
+          <text x="358" y="${pipeY - 4}" font-size="11" text-anchor="middle" fill="${inletColor}" font-family="sans-serif" font-weight="700">${inletTemp != null ? `${inletTemp}${inletUnit}` : '—'}</text>
+          <text x="358" y="${pipeY + pipeH + 12}" font-size="7" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-family="sans-serif" font-weight="600">COLD INPUT</text>
+
+          <!-- Delta T badge centered below heater -->
+          ${data.delta_t != null
+            ? html`
+                <rect x="170" y="162" width="60" height="16" rx="8" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="0.8"/>
+                <text x="200" y="174" font-size="9" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="sans-serif" font-weight="600">ΔT ${data.delta_t}°</text>
               `
             : ''}
         </svg>

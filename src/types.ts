@@ -204,6 +204,8 @@ export interface FloorSystemConfig {
   extra_sensors?: string[];
   /** Auto-discover floor system sensors by pattern matching */
   auto_discover?: boolean;
+  /** Custom image URL for the tankless heater unit visual */
+  heater_image?: string;
 }
 
 export interface FloorSystemMetric {
