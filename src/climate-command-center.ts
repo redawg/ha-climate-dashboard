@@ -870,16 +870,17 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="0.8"/>
           <!-- Set temp overlay aligned with display circle on heater photo -->
           ${(() => {
-            const heating = data.heater_state === 'heating' || data.heater_state === 'heat';
-            const tempColor = heating ? '#8b0000' : '#1a1a1a';
-            const subColor = heating ? 'rgba(139,0,0,0.7)' : 'rgba(0,0,0,0.45)';
+            const st = data.heater_state ?? '';
+            const active = st !== 'idle' && st !== 'off' && st !== '' && st !== 'unavailable';
+            const tempColor = active ? '#1b5e20' : '#1a1a1a';
+            const subColor = active ? 'rgba(27,94,32,0.7)' : 'rgba(0,0,0,0.45)';
             const cx = heaterX + heaterW * 0.65;
             return svg`
-              <text x="${cx}" y="${data.set_temp != null ? heaterY + heaterH * 0.23 : heaterY + heaterH * 0.27}" font-size="12" text-anchor="middle"
+              <text x="${cx}" y="${data.set_temp != null ? heaterY + heaterH * 0.23 : heaterY + heaterH * 0.27}" font-size="11" text-anchor="middle"
                 fill="${tempColor}" font-family="sans-serif" font-weight="800"
               >${data.set_temp != null ? `${data.set_temp}°` : outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
               ${data.set_temp != null ? svg`
-                <text x="${cx}" y="${heaterY + heaterH * 0.31}" font-size="5.5" text-anchor="middle"
+                <text x="${cx}" y="${heaterY + heaterH * 0.31}" font-size="5" text-anchor="middle"
                   fill="${subColor}" font-family="sans-serif" font-weight="700">SET</text>
               ` : ''}
             `;
