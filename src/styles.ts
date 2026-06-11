@@ -394,11 +394,11 @@ export const styles: CSSResultGroup = css`
   }
 
   .zone-card.mode-heat {
-    background: linear-gradient(180deg, rgba(255, 112, 67, 0.08), transparent 60%);
+    /* no background glow — glow only when actively heating (action-heating) */
   }
 
   .zone-card.mode-cool {
-    background: linear-gradient(180deg, rgba(66, 165, 245, 0.08), transparent 60%);
+    /* no background glow — glow only when actively cooling (action-cooling) */
   }
 
   .zone-header {
@@ -482,11 +482,13 @@ export const styles: CSSResultGroup = css`
   }
 
   .zone-card.action-heating {
+    background: linear-gradient(180deg, rgba(255, 112, 67, 0.08), transparent 60%);
     border-left-color: #ff7043;
     border-left-width: 4px;
   }
 
   .zone-card.action-cooling {
+    background: linear-gradient(180deg, rgba(66, 165, 245, 0.08), transparent 60%);
     border-left-color: #42a5f5;
     border-left-width: 4px;
   }
