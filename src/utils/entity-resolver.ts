@@ -17,7 +17,35 @@ import {
   ZoneSensors,
 } from '../types';
 
-const WEATHER_PATTERNS = ['weather', 'tempest', 'wet bulb', 'dew point', 'feels like'];
+const WEATHER_PATTERNS = [
+  'weather',
+  'tempest',
+  'weatherflow',
+  'wet bulb',
+  'dew point',
+  'feels like',
+  'heat index',
+  'wind chill',
+  'wind speed',
+  'wind gust',
+  'wind bearing',
+  'wind direction',
+  'barometric',
+  'sea level',
+  'air density',
+  'lightning',
+  'solar radiation',
+  'solar lux',
+  'rain',
+  'precipitation',
+  'uv index',
+  'ultraviolet',
+  'visibility',
+  'cloud base',
+  'beaufort',
+  'wardman',
+  'desert hot springs',
+];
 const EXCLUDE_PATTERNS = [
   'deye',
   'sunsynk',
