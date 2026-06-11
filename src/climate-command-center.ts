@@ -12,6 +12,7 @@ import {
   FloorSection,
   FloorSystemConfig,
   FloorSystemData,
+  FloorSystemEntityIds,
   SunData,
   WeatherData,
   ZoneSensors,
@@ -25,7 +26,9 @@ import {
   getSunData,
   autoAssignSensorToZone,
   listHaAreas,
-  resolveFloorSystem,
+  buildFloorSystemData,
+  discoverFloorSystemEntityIds,
+  listFloorSystemEntityIds,
 } from './utils/entity-resolver';
 import { computeZoneHeightStats } from './utils/height-averages';
 import { FLOORPLAN_IMAGE } from './floorplan-image';
@@ -44,8 +47,9 @@ declare global {
 
 @customElement('climate-command-center')
 export class ClimateCommandCenterCard extends LitElement implements LovelaceCard {
-  @property({ attribute: false }) public hass!: HomeAssistant;
   @property({ attribute: false }) private _config!: ClimateCommandCenterConfig;
+  private _hass?: HomeAssistant;
+  private _floorSystemEntityIds: FloorSystemEntityIds | null | undefined;
   @state() private _expandedZone: string | null = null;
   @state() private _editSensors = false;
   @state() private _setupMode = false;
@@ -58,6 +62,36 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
 
   static get styles(): CSSResultGroup {
     return styles;
+  }
+
+  public get hass(): HomeAssistant {
+    return this._hass!;
+  }
+
+  public set hass(hass: HomeAssistant) {
+    const prev = this._hass;
+    this._hass = hass;
+    if (!this._floorSystemEntityIds && hass && this._config) {
+      this._floorSystemEntityIds = discoverFloorSystemEntityIds(hass, this._config);
+    }
+    if (!this._forecastUnsub && hass) {
+      this._subscribeForecast();
+    }
+    if (!prev || prev !== hass || this._floorSystemStatesChanged(prev, hass)) {
+      this.requestUpdate();
+    }
+  }
+
+  private _floorSystemStatesChanged(prev: HomeAssistant, next: HomeAssistant): boolean {
+    const ids = this._floorSystemEntityIds;
+    if (!ids) return false;
+    for (const entityId of listFloorSystemEntityIds(ids)) {
+      const oldState = prev.states[entityId];
+      const newState = next.states[entityId];
+      if (oldState?.state !== newState?.state) return true;
+      if (oldState?.last_updated !== newState?.last_updated) return true;
+    }
+    return false;
   }
 
   public setConfig(config: ClimateCommandCenterConfig): void {
@@ -75,6 +109,10 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       ...config,
       floors: config.floors?.length ? config.floors : DEFAULT_FLOORS,
     };
+    this._floorSystemEntityIds = undefined;
+    if (this._hass) {
+      this._floorSystemEntityIds = discoverFloorSystemEntityIds(this._hass, this._config);
+    }
   }
 
   public getCardSize(): number {
@@ -89,12 +127,6 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   public disconnectedCallback(): void {
     super.disconnectedCallback();
     this._unsubscribeForecast();
-  }
-
-  protected updated(changedProps: Map<string, unknown>): void {
-    if (changedProps.has('hass') && !this._forecastUnsub) {
-      this._subscribeForecast();
-    }
   }
 
   private async _subscribeForecast(): Promise<void> {
@@ -149,7 +181,26 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   }
 
   private get floorSystem(): FloorSystemData | null {
-    return resolveFloorSystem(this.hass, this._config);
+    if (!this._hass) return null;
+    if (this._floorSystemEntityIds === undefined) {
+      this._floorSystemEntityIds = discoverFloorSystemEntityIds(this._hass, this._config);
+    }
+    if (!this._floorSystemEntityIds) return null;
+    return buildFloorSystemData(this._hass, this._floorSystemEntityIds);
+  }
+
+  /** Read power draw live from hass.states for real-time kW display. */
+  private formatPowerKw(powerEntityId: string | undefined, fallbackUnit?: string): string | undefined {
+    if (!powerEntityId || !this._hass) return undefined;
+    const entity = this._hass.states[powerEntityId];
+    if (!entity || entity.state === 'unavailable' || entity.state === 'unknown') return undefined;
+    const raw = parseFloat(entity.state);
+    if (isNaN(raw)) return undefined;
+    const unit =
+      ((entity.attributes.unit_of_measurement as string | undefined) ?? fallbackUnit ?? '').toLowerCase();
+    const kw = unit === 'kw' ? raw : raw / 1000;
+    const decimals = kw >= 1 ? 1 : kw >= 0.01 ? 2 : 3;
+    return String(parseFloat(kw.toFixed(decimals)));
   }
 
   private get sunData(): SunData | null {
@@ -875,11 +926,8 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             if (data.flow_rate) stats.push({ label: 'FLOW', value: `${data.flow_rate.value} ${data.flow_rate.unit}`, color: '#64b5f6' });
             if (data.delta_t != null) stats.push({ label: 'ΔT', value: `${data.delta_t}°`, color: 'rgba(255,255,255,0.7)' });
             if (data.power) {
-              const kw =
-                data.power.unit === 'kW' ? data.power.value : data.power.value / 1000;
-              const decimals = kw >= 1 ? 1 : kw >= 0.01 ? 2 : 3;
-              const kwStr = String(parseFloat(kw.toFixed(decimals)));
-              stats.push({ label: 'kW', value: kwStr, color: '#ffb74d' });
+              const kwStr = this.formatPowerKw(data.power.entity_id, data.power.unit);
+              if (kwStr != null) stats.push({ label: 'kW', value: kwStr, color: '#ffb74d' });
             }
             if (!stats.length) return '';
             const spacing = 400 / (stats.length + 1);

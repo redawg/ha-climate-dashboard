@@ -8,6 +8,7 @@ import {
   FloorConfig,
   FloorSection,
   FloorSystemData,
+  FloorSystemEntityIds,
   FloorSystemMetric,
   ForecastEntry,
   HaAreaOption,
@@ -297,10 +298,12 @@ function entityArea(hass: HomeAssistant, entityId: string): string | undefined {
   return areaName(hass, entityAreaId(hass, entityId));
 }
 
-function parseNumber(state: HassEntity | undefined): number | undefined {
+function parseNumber(state: HassEntity | undefined, precision = 1): number | undefined {
   if (!state || state.state === 'unavailable' || state.state === 'unknown') return undefined;
   const val = parseFloat(state.state);
-  return isNaN(val) ? undefined : Math.round(val * 10) / 10;
+  if (isNaN(val)) return undefined;
+  const factor = 10 ** precision;
+  return Math.round(val * factor) / factor;
 }
 
 function getEntity(hass: HomeAssistant, entityId: string | undefined): HassEntity | undefined {
@@ -1002,10 +1005,14 @@ function matchesHints(name: string, entityId: string, hints: string[]): boolean 
   return hints.some((h) => haystack.includes(normalize(h)));
 }
 
-function metricFromEntity(hass: HomeAssistant, entityId: string | undefined): FloorSystemMetric | undefined {
+function metricFromEntity(
+  hass: HomeAssistant,
+  entityId: string | undefined,
+  precision = 1
+): FloorSystemMetric | undefined {
   const entity = getEntity(hass, entityId);
   if (!entity) return undefined;
-  const value = parseNumber(entity);
+  const value = parseNumber(entity, precision);
   if (value == null) return undefined;
   const unit =
     (entity.attributes.unit_of_measurement as string | undefined) ??
@@ -1113,10 +1120,10 @@ function discoverFloorEntity(
   return best?.id;
 }
 
-export function resolveFloorSystem(
+export function discoverFloorSystemEntityIds(
   hass: HomeAssistant,
   config: ClimateCommandCenterConfig
-): FloorSystemData | null {
+): FloorSystemEntityIds | null {
   const floorConfig = config.floor_system;
   if (floorConfig === false) return null;
   const effectiveConfig = floorConfig || { auto_discover: true };
@@ -1131,7 +1138,6 @@ export function resolveFloorSystem(
   const shouldAutoDiscover = effectiveConfig.auto_discover || !hasExplicit;
 
   const usedIds = new Set<string>();
-  const result: FloorSystemData = {};
 
   const resolveId = (
     explicit: string | undefined,
@@ -1142,77 +1148,108 @@ export function resolveFloorSystem(
     return discoverFloorEntity(hass, hint, usedIds);
   };
 
+  const ids: FloorSystemEntityIds = {};
+
   const supplyId = resolveId(effectiveConfig.supply_temp, 'supply');
-  if (supplyId) {
-    usedIds.add(supplyId);
-    result.supply_temp = metricFromEntity(hass, supplyId);
-  }
+  if (supplyId) usedIds.add(supplyId);
+  ids.supply_temp = supplyId;
 
   const returnId = resolveId(effectiveConfig.return_temp, 'return');
-  if (returnId) {
-    usedIds.add(returnId);
-    result.return_temp = metricFromEntity(hass, returnId);
-  }
+  if (returnId) usedIds.add(returnId);
+  ids.return_temp = returnId;
+
+  const flowId = resolveId(effectiveConfig.flow_rate, 'flow');
+  if (flowId) usedIds.add(flowId);
+  ids.flow_rate = flowId;
+
+  const pumpId = resolveId(effectiveConfig.pump_status, 'pump');
+  if (pumpId) usedIds.add(pumpId);
+  ids.pump_status = pumpId;
+
+  const powerId = resolveId(effectiveConfig.power, 'power');
+  if (powerId) usedIds.add(powerId);
+  ids.power = powerId;
+
+  const waterHeater = Object.values(hass.states).find((e) => e.entity_id.startsWith('water_heater.'));
+  if (waterHeater) ids.heater = waterHeater.entity_id;
+
+  const extraIds = effectiveConfig.extra_sensors ?? [];
+  if (extraIds.length) ids.extra = extraIds.filter((id) => !usedIds.has(id));
+
+  const hasData =
+    ids.supply_temp ||
+    ids.return_temp ||
+    ids.flow_rate ||
+    ids.pump_status ||
+    ids.power ||
+    ids.heater ||
+    (ids.extra?.length ?? 0) > 0;
+
+  return hasData ? ids : null;
+}
+
+export function listFloorSystemEntityIds(ids: FloorSystemEntityIds): string[] {
+  const list: string[] = [];
+  if (ids.supply_temp) list.push(ids.supply_temp);
+  if (ids.return_temp) list.push(ids.return_temp);
+  if (ids.flow_rate) list.push(ids.flow_rate);
+  if (ids.pump_status) list.push(ids.pump_status);
+  if (ids.power) list.push(ids.power);
+  if (ids.heater) list.push(ids.heater);
+  if (ids.extra?.length) list.push(...ids.extra);
+  return list;
+}
+
+export function buildFloorSystemData(hass: HomeAssistant, ids: FloorSystemEntityIds): FloorSystemData | null {
+  const result: FloorSystemData = {};
+
+  if (ids.supply_temp) result.supply_temp = metricFromEntity(hass, ids.supply_temp);
+  if (ids.return_temp) result.return_temp = metricFromEntity(hass, ids.return_temp);
 
   if (result.supply_temp?.value != null && result.return_temp?.value != null) {
     result.delta_t = Math.round((result.supply_temp.value - result.return_temp.value) * 10) / 10;
   }
 
-  const flowId = resolveId(effectiveConfig.flow_rate, 'flow');
-  if (flowId) {
-    usedIds.add(flowId);
-    result.flow_rate = metricFromEntity(hass, flowId);
-  }
-
-  const pumpId = resolveId(effectiveConfig.pump_status, 'pump');
-  if (pumpId) {
-    usedIds.add(pumpId);
-    const pumpEntity = getEntity(hass, pumpId);
+  if (ids.flow_rate) result.flow_rate = metricFromEntity(hass, ids.flow_rate);
+  if (ids.pump_status) {
+    const pumpEntity = getEntity(hass, ids.pump_status);
     if (pumpEntity) {
-      result.pump_entity = pumpId;
+      result.pump_entity = ids.pump_status;
       result.pump_active = isPumpActive(pumpEntity);
     }
   }
+  if (ids.power) result.power = metricFromEntity(hass, ids.power, 3);
 
-  const powerId = resolveId(effectiveConfig.power, 'power');
-  if (powerId) {
-    usedIds.add(powerId);
-    result.power = metricFromEntity(hass, powerId);
-  }
-
-  // Discover water_heater entity for set temperature
-  const waterHeater = Object.values(hass.states).find(
-    (e) => e.entity_id.startsWith('water_heater.')
-  );
-  if (waterHeater) {
-    result.heater_entity = waterHeater.entity_id;
-    result.heater_state = waterHeater.state;
-    const setTemp = waterHeater.attributes.temperature as number | undefined;
-    if (setTemp != null) {
-      result.set_temp = setTemp;
-      result.set_temp_unit =
-        (waterHeater.attributes.unit_of_measurement as string | undefined) ??
-        (waterHeater.attributes.temperature_unit as string | undefined) ?? '°';
+  if (ids.heater) {
+    const waterHeater = getEntity(hass, ids.heater);
+    if (waterHeater) {
+      result.heater_entity = ids.heater;
+      result.heater_state = waterHeater.state;
+      const setTemp = waterHeater.attributes.temperature as number | undefined;
+      if (setTemp != null) {
+        result.set_temp = setTemp;
+        result.set_temp_unit =
+          (waterHeater.attributes.unit_of_measurement as string | undefined) ??
+          (waterHeater.attributes.temperature_unit as string | undefined) ?? '°';
+      }
     }
   }
 
-  const extraIds = effectiveConfig.extra_sensors ?? [];
-  const extra: FloorSystemData['extra'] = [];
-  for (const entityId of extraIds) {
-    if (usedIds.has(entityId)) continue;
-    const entity = getEntity(hass, entityId);
-    if (!entity) continue;
-    const value = parseNumber(entity);
-    if (value == null) continue;
-    const name = friendlyLabel(friendlyName(entity), entityId);
-    const unit =
-      (entity.attributes.unit_of_measurement as string | undefined) ??
-      (entity.attributes.device_class === 'humidity' ? '%' : '');
-    extra.push({ entity_id: entityId, name, value, unit });
-    usedIds.add(entityId);
+  if (ids.extra?.length) {
+    const extra: FloorSystemData['extra'] = [];
+    for (const entityId of ids.extra) {
+      const entity = getEntity(hass, entityId);
+      if (!entity) continue;
+      const value = parseNumber(entity);
+      if (value == null) continue;
+      const name = friendlyLabel(friendlyName(entity), entityId);
+      const unit =
+        (entity.attributes.unit_of_measurement as string | undefined) ??
+        (entity.attributes.device_class === 'humidity' ? '%' : '');
+      extra.push({ entity_id: entityId, name, value, unit });
+    }
+    if (extra.length) result.extra = extra;
   }
-
-  if (extra.length) result.extra = extra;
 
   const hasData =
     result.supply_temp ||
@@ -1223,6 +1260,15 @@ export function resolveFloorSystem(
     (result.extra?.length ?? 0) > 0;
 
   return hasData ? result : null;
+}
+
+export function resolveFloorSystem(
+  hass: HomeAssistant,
+  config: ClimateCommandCenterConfig
+): FloorSystemData | null {
+  const ids = discoverFloorSystemEntityIds(hass, config);
+  if (!ids) return null;
+  return buildFloorSystemData(hass, ids);
 }
 
 export function getWeatherData(

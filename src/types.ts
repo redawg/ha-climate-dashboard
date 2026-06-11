@@ -226,6 +226,17 @@ export interface FloorSystemMetric {
   unit: string;
 }
 
+/** Resolved entity IDs for the floor / tankless water heater system (stable across hass updates). */
+export interface FloorSystemEntityIds {
+  supply_temp?: string;
+  return_temp?: string;
+  flow_rate?: string;
+  pump_status?: string;
+  power?: string;
+  heater?: string;
+  extra?: string[];
+}
+
 export interface FloorSystemData {
   supply_temp?: FloorSystemMetric;
   return_temp?: FloorSystemMetric;
