@@ -698,19 +698,19 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     const customImage = fs !== false && fs?.heater_image?.trim() ? fs.heater_image.trim() : undefined;
     const heaterImage = customImage ?? DEFAULT_HEATER_IMAGE;
 
-    const heaterX = 100;
-    const heaterY = 38;
-    const heaterW = 200;
-    const heaterH = 92;
+    const heaterW = 136;
+    const heaterH = 136;
+    const heaterX = 200 - heaterW / 2;
+    const heaterY = 12;
     const heaterBottom = heaterY + heaterH;
-    const pipeY = 138;
+    const pipeY = heaterBottom + 14;
     const pipeH = 14;
-    const leftStubX = 125;
-    const rightStubX = 275;
+    const leftStubX = heaterX + heaterW * 0.36;
+    const rightStubX = heaterX + heaterW * 0.57;
 
     return html`
       <div class="floor-system tankless-visual">
-        <svg class="tankless-svg" viewBox="0 0 400 180" preserveAspectRatio="xMidYMid meet">
+        <svg class="tankless-svg" viewBox="0 0 400 210" preserveAspectRatio="xMidYMid meet">
           <defs>
             <clipPath id="heaterClip">
               <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"/>
@@ -804,26 +804,26 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <rect x="${leftStubX - 7}" y="${heaterBottom - 2}" width="14" height="10" rx="2" fill="#b87333" stroke="#8b5a2b" stroke-width="0.5"/>
           <rect x="${rightStubX - 7}" y="${heaterBottom - 2}" width="14" height="10" rx="2" fill="#b87333" stroke="#8b5a2b" stroke-width="0.5"/>
 
-          <!-- Outlet pipe (hot supply) — curves up from horizontal into heater stub -->
-          <path d="M 0,${pipeY + pipeH / 2} L ${leftStubX - 22},${pipeY + pipeH / 2} Q ${leftStubX},${pipeY + pipeH / 2} ${leftStubX},${pipeY - 6} L ${leftStubX},${heaterBottom + 7}"
+          <!-- Outlet pipe (hot supply) — sweeps from left edge down and curves up into heater stub -->
+          <path d="M 0,${pipeY + pipeH / 2} L ${leftStubX - 40},${pipeY + pipeH / 2} Q ${leftStubX},${pipeY + pipeH / 2} ${leftStubX},${heaterBottom + 8}"
             fill="none" stroke="rgba(200,200,210,0.35)" stroke-width="${pipeH}" stroke-linecap="round"/>
-          <path d="M 0,${pipeY + pipeH / 2} L ${leftStubX - 22},${pipeY + pipeH / 2} Q ${leftStubX},${pipeY + pipeH / 2} ${leftStubX},${pipeY - 6} L ${leftStubX},${heaterBottom + 7}"
+          <path d="M 0,${pipeY + pipeH / 2} L ${leftStubX - 40},${pipeY + pipeH / 2} Q ${leftStubX},${pipeY + pipeH / 2} ${leftStubX},${heaterBottom + 8}"
             fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="${pipeH - 2}" stroke-linecap="round"/>
-          <path d="M 3,${pipeY + pipeH / 2} L ${leftStubX - 22},${pipeY + pipeH / 2} Q ${leftStubX},${pipeY + pipeH / 2} ${leftStubX},${pipeY - 6} L ${leftStubX},${heaterBottom + 8}"
+          <path d="M 3,${pipeY + pipeH / 2} L ${leftStubX - 40},${pipeY + pipeH / 2} Q ${leftStubX},${pipeY + pipeH / 2} ${leftStubX},${heaterBottom + 8}"
             fill="none" stroke="url(#outletFlow)" stroke-width="${pipeH - 4}" stroke-linecap="round"/>
           <!-- Glass highlight on horizontal section -->
-          <path d="M 6,${pipeY + 2} L ${leftStubX - 26},${pipeY + 2}"
+          <path d="M 6,${pipeY + 2} L ${leftStubX - 44},${pipeY + 2}"
             fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2" stroke-linecap="round"/>
 
-          <!-- Inlet pipe (cold return) — curves up from horizontal into heater stub -->
-          <path d="M 400,${pipeY + pipeH / 2} L ${rightStubX + 22},${pipeY + pipeH / 2} Q ${rightStubX},${pipeY + pipeH / 2} ${rightStubX},${pipeY - 6} L ${rightStubX},${heaterBottom + 7}"
+          <!-- Inlet pipe (cold return) — sweeps from right edge down and curves up into heater stub -->
+          <path d="M 400,${pipeY + pipeH / 2} L ${rightStubX + 40},${pipeY + pipeH / 2} Q ${rightStubX},${pipeY + pipeH / 2} ${rightStubX},${heaterBottom + 8}"
             fill="none" stroke="rgba(200,200,210,0.35)" stroke-width="${pipeH}" stroke-linecap="round"/>
-          <path d="M 400,${pipeY + pipeH / 2} L ${rightStubX + 22},${pipeY + pipeH / 2} Q ${rightStubX},${pipeY + pipeH / 2} ${rightStubX},${pipeY - 6} L ${rightStubX},${heaterBottom + 7}"
+          <path d="M 400,${pipeY + pipeH / 2} L ${rightStubX + 40},${pipeY + pipeH / 2} Q ${rightStubX},${pipeY + pipeH / 2} ${rightStubX},${heaterBottom + 8}"
             fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="${pipeH - 2}" stroke-linecap="round"/>
-          <path d="M 397,${pipeY + pipeH / 2} L ${rightStubX + 22},${pipeY + pipeH / 2} Q ${rightStubX},${pipeY + pipeH / 2} ${rightStubX},${pipeY - 6} L ${rightStubX},${heaterBottom + 8}"
+          <path d="M 397,${pipeY + pipeH / 2} L ${rightStubX + 40},${pipeY + pipeH / 2} Q ${rightStubX},${pipeY + pipeH / 2} ${rightStubX},${heaterBottom + 8}"
             fill="none" stroke="url(#inletFlow)" stroke-width="${pipeH - 4}" stroke-linecap="round"/>
           <!-- Glass highlight on horizontal section -->
-          <path d="M ${rightStubX + 26},${pipeY + 2} L 394,${pipeY + 2}"
+          <path d="M ${rightStubX + 44},${pipeY + 2} L 394,${pipeY + 2}"
             fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2" stroke-linecap="round"/>
 
           <!-- Hot output temp label (left) -->
@@ -834,11 +834,11 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <text x="358" y="${pipeY - 4}" font-size="11" text-anchor="middle" fill="${inletColor}" font-family="sans-serif" font-weight="700">${inletTemp != null ? `${inletTemp}${inletUnit}` : '—'}</text>
           <text x="358" y="${pipeY + pipeH + 12}" font-size="7" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-family="sans-serif" font-weight="600">COLD INPUT</text>
 
-          <!-- Delta T badge centered below heater -->
+          <!-- Delta T badge centered below pipes -->
           ${data.delta_t != null
             ? html`
-                <rect x="170" y="162" width="60" height="16" rx="8" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="0.8"/>
-                <text x="200" y="174" font-size="9" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="sans-serif" font-weight="600">ΔT ${data.delta_t}°</text>
+                <rect x="170" y="${pipeY + pipeH + 14}" width="60" height="16" rx="8" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="0.8"/>
+                <text x="200" y="${pipeY + pipeH + 26}" font-size="9" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="sans-serif" font-weight="600">ΔT ${data.delta_t}°</text>
               `
             : ''}
         </svg>
