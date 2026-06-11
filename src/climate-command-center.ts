@@ -1,6 +1,7 @@
 import { CSSResultGroup, html, LitElement, TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
-import { fireEvent, HomeAssistant, LovelaceCard, LovelaceCardEditor } from 'custom-card-helpers';
+import { HomeAssistant, LovelaceCard, LovelaceCardEditor } from 'custom-card-helpers';
+import { fireEvent } from './utils/fire-event';
 import { styles } from './styles';
 import {
   AreaSensor,
@@ -9,6 +10,7 @@ import {
   ForecastEntry,
   FloorPlanThermostat,
   FloorSection,
+  FloorSystemConfig,
   FloorSystemData,
   SunData,
   WeatherData,
@@ -46,6 +48,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   @state() private _expandedZone: string | null = null;
   @state() private _editSensors = false;
   @state() private _setupMode = false;
+  @state() private _setupSaveReminder = false;
   @state() private _view: 'cards' | 'floorplan' = 'cards';
   @state() private _placingThermostat: 'wall' | 'floor' | null = null;
   @state() private _forecast: ForecastEntry[] | null = null;
@@ -214,6 +217,183 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     fireEvent(this, 'config-changed', { config: next });
   }
 
+  private toggleSetupMode(): void {
+    if (this._setupMode) {
+      this._setupMode = false;
+      this._setupSaveReminder = true;
+    } else {
+      this._setupMode = true;
+      this._editSensors = false;
+      this._setupSaveReminder = false;
+    }
+  }
+
+  private updateFloorSystem(field: string, value: string): void {
+    if (field === 'disabled') {
+      const next =
+        value === 'true'
+          ? { ...this._config, floor_system: false as const }
+          : { ...this._config, floor_system: undefined };
+      this._config = next;
+      fireEvent(this, 'config-changed', { config: next });
+      return;
+    }
+
+    if (this._config.floor_system === false) return;
+
+    const current: FloorSystemConfig = { ...(this._config.floor_system ?? {}) };
+    const key = field as keyof FloorSystemConfig;
+
+    if (value === '' || value === '__auto__') {
+      delete current[key];
+    } else {
+      (current as Record<string, string>)[field] = value;
+    }
+
+    const hasExplicit =
+      current.supply_temp ||
+      current.return_temp ||
+      current.flow_rate ||
+      current.pump_status ||
+      (current.extra_sensors?.length ?? 0) > 0;
+
+    const next = {
+      ...this._config,
+      floor_system: hasExplicit ? current : undefined,
+    };
+    this._config = next;
+    fireEvent(this, 'config-changed', { config: next });
+  }
+
+  private floorSystemEntityOptions(
+    field: 'supply_temp' | 'return_temp' | 'flow_rate' | 'pump_status'
+  ): string[] {
+    const states = Object.values(this.hass.states);
+    const matchId = (id: string, terms: string[]) => terms.some((t) => id.includes(t));
+
+    switch (field) {
+      case 'supply_temp':
+        return states
+          .filter((e) => {
+            if (!e.entity_id.startsWith('sensor.')) return false;
+            const id = e.entity_id.toLowerCase();
+            return (
+              e.attributes.device_class === 'temperature' ||
+              matchId(id, ['supply', 'hot', 'outlet'])
+            );
+          })
+          .map((e) => e.entity_id)
+          .sort();
+      case 'return_temp':
+        return states
+          .filter((e) => {
+            if (!e.entity_id.startsWith('sensor.')) return false;
+            const id = e.entity_id.toLowerCase();
+            return (
+              e.attributes.device_class === 'temperature' ||
+              matchId(id, ['return', 'cold', 'inlet'])
+            );
+          })
+          .map((e) => e.entity_id)
+          .sort();
+      case 'flow_rate':
+        return states
+          .filter((e) => {
+            if (!e.entity_id.startsWith('sensor.')) return false;
+            const id = e.entity_id.toLowerCase();
+            return matchId(id, ['flow', 'gpm', 'gallons']);
+          })
+          .map((e) => e.entity_id)
+          .sort();
+      case 'pump_status':
+        return states
+          .filter((e) => {
+            const id = e.entity_id.toLowerCase();
+            if (!id.startsWith('switch.') && !id.startsWith('binary_sensor.')) return false;
+            return matchId(id, ['pump', 'boiler', 'circulator']);
+          })
+          .map((e) => e.entity_id)
+          .sort();
+    }
+  }
+
+  private floorSystemFieldValue(
+    field: 'supply_temp' | 'return_temp' | 'flow_rate' | 'pump_status'
+  ): string {
+    if (this._config.floor_system === false) return '__auto__';
+    const fs = this._config.floor_system;
+    if (!fs) return '__auto__';
+    return fs[field] ?? '__auto__';
+  }
+
+  private floorSystemStatusLabel(): string {
+    if (this._config.floor_system === false) return 'Disabled';
+    const fs = this._config.floor_system;
+    if (!fs) return 'Auto-discovered';
+    const hasExplicit =
+      fs.supply_temp || fs.return_temp || fs.flow_rate || fs.pump_status;
+    return hasExplicit ? 'Configured' : 'Auto-discovered';
+  }
+
+  private entityOptionLabel(entityId: string): string {
+    const state = this.hass.states[entityId];
+    const name = (state?.attributes?.friendly_name as string | undefined) ?? entityId;
+    return `${name} (${entityId})`;
+  }
+
+  private renderFloorSystemFieldSelect(
+    label: string,
+    field: 'supply_temp' | 'return_temp' | 'flow_rate' | 'pump_status'
+  ): TemplateResult {
+    const options = this.floorSystemEntityOptions(field);
+    const value = this.floorSystemFieldValue(field);
+    const disabled = this._config.floor_system === false;
+    return html`
+      <label class="floor-system-field">
+        <span class="floor-system-field-label">${label}</span>
+        <select
+          .value=${value}
+          ?disabled=${disabled}
+          @change=${(e: Event) =>
+            this.updateFloorSystem(field, (e.target as HTMLSelectElement).value)}
+        >
+          <option value="__auto__">Auto-discover</option>
+          ${options.map((eid) => html`<option value=${eid}>${this.entityOptionLabel(eid)}</option>`)}
+        </select>
+      </label>
+    `;
+  }
+
+  private renderFloorSystemSetup(): TemplateResult {
+    const disabled = this._config.floor_system === false;
+    return html`
+      <div class="floor-system-setup" @click=${(e: Event) => e.stopPropagation()}>
+        <div class="floor-system-setup-header">
+          <span class="floor-system-setup-title">Floor System Setup</span>
+          <span class="floor-system-setup-status">${this.floorSystemStatusLabel()}</span>
+        </div>
+        <div class="floor-system-setup-fields">
+          ${this.renderFloorSystemFieldSelect('Supply Temp', 'supply_temp')}
+          ${this.renderFloorSystemFieldSelect('Return Temp', 'return_temp')}
+          ${this.renderFloorSystemFieldSelect('Flow Rate', 'flow_rate')}
+          ${this.renderFloorSystemFieldSelect('Pump Status', 'pump_status')}
+        </div>
+        <label class="floor-system-disable">
+          <input
+            type="checkbox"
+            .checked=${disabled}
+            @change=${(e: Event) =>
+              this.updateFloorSystem(
+                'disabled',
+                (e.target as HTMLInputElement).checked ? 'true' : 'false'
+              )}
+          />
+          Disable floor system
+        </label>
+      </div>
+    `;
+  }
+
   private async updateZoneHaArea(climateEntity: string, areaId: string): Promise<void> {
     if (!areaId) return;
     try {
@@ -369,6 +549,82 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   private tempDelta(current: number | undefined, target: number | undefined): number | undefined {
     if (current == null || target == null) return undefined;
     return Math.round((current - target) * 10) / 10;
+  }
+
+  private renderValveLine(zone: ClimateZone): TemplateResult | null {
+    if (zone.valve_entity == null) return null;
+
+    const floorTemp = zone.sensors.floor;
+    const color = this.tempToColor(floorTemp);
+    const active = zone.valve_active === true;
+    const position = zone.valve_position;
+    const patternId = `valve-flow-${zone.climate_entity.replace(/\./g, '-')}`;
+    const bgFill = active
+      ? color.replace('rgb(', 'rgba(').replace(')', ',0.1)')
+      : 'rgba(100,100,120,0.15)';
+
+    return html`
+      <div class="valve-line">
+        <svg class="valve-svg" viewBox="0 0 280 20" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            ${active
+              ? html`
+                  <pattern id="${patternId}" x="0" y="0" width="20" height="12" patternUnits="userSpaceOnUse">
+                    <circle r="2" cx="5" cy="6" fill="${color}" opacity="0.7">
+                      <animate attributeName="cx" from="-5" to="25" dur="1s" repeatCount="indefinite" />
+                    </circle>
+                    <circle r="1.5" cx="15" cy="6" fill="${color}" opacity="0.5">
+                      <animate attributeName="cx" from="5" to="35" dur="1s" repeatCount="indefinite" />
+                    </circle>
+                  </pattern>
+                `
+              : ''}
+          </defs>
+          <rect
+            x="10"
+            y="4"
+            width="200"
+            height="12"
+            rx="6"
+            fill="${bgFill}"
+            stroke="${active ? color : 'rgba(150,150,170,0.3)'}"
+            stroke-width="1"
+          />
+          <rect
+            x="12"
+            y="6"
+            width="196"
+            height="8"
+            rx="4"
+            fill="${active ? `url(#${patternId})` : 'rgba(100,130,160,0.2)'}"
+          />
+          <text
+            x="225"
+            y="14"
+            font-size="10"
+            fill="${active ? color : 'rgba(150,150,170,0.5)'}"
+            font-family="sans-serif"
+            font-weight="600"
+          >
+            ${active ? '🔓' : '🔒'}
+          </text>
+          ${position != null
+            ? html`
+                <text
+                  x="250"
+                  y="14"
+                  font-size="9"
+                  fill="${active ? color : 'rgba(150,150,170,0.5)'}"
+                  font-family="sans-serif"
+                  font-weight="600"
+                >
+                  ${position}%
+                </text>
+              `
+            : ''}
+        </svg>
+      </div>
+    `;
   }
 
   private tempToColor(temp: number | undefined): string {
@@ -933,6 +1189,8 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
               : ''}
         </div>
 
+        ${this.renderValveLine(zone)}
+
         ${this.renderZoneHeightStats(zone, current)}
 
         ${this.renderZoneSensorsBlock(zone)}
@@ -1205,7 +1463,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
               ? html`
                   <button
                     class="edit-sensors-btn ${this._setupMode ? 'active' : ''}"
-                    @click=${() => { this._setupMode = !this._setupMode; if (this._setupMode) this._editSensors = false; }}
+                    @click=${() => this.toggleSetupMode()}
                   >
                     ${this._setupMode ? 'Done' : 'Setup'}
                   </button>
@@ -1234,8 +1492,24 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
               ${this.renderFloorPlan()}
             `
           : html`
+              ${this._setupSaveReminder && !this._setupMode
+                ? html`
+                    <div class="setup-save-reminder">
+                      Setup changes (zone heating types and floor system entities) are queued for
+                      persistence. Storage-mode dashboards save automatically; YAML-mode dashboards
+                      require editing the dashboard YAML manually.
+                    </div>
+                  `
+                : ''}
               ${this._setupMode
-                ? html`<div class="edit-hint">Set each zone's heating type: Floor Heat or HVAC. Save the dashboard to keep changes.</div>`
+                ? html`
+                    <div class="edit-hint">
+                      Set each zone's heating type (Floor Heat or HVAC) and configure floor system
+                      sensors below. Changes persist automatically on storage-mode dashboards. YAML-mode
+                      dashboards must be edited manually.
+                    </div>
+                    ${this.renderFloorSystemSetup()}
+                  `
                 : this._editSensors
                   ? html`<div class="edit-hint">Assign sensors to HA areas or zones, set floor per zone, or hide. Save the dashboard to keep layout changes.</div>`
                   : ''}

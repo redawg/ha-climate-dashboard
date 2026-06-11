@@ -425,6 +425,169 @@ function findBestSensor(
   return best?.id;
 }
 
+function resolveValve(
+  hass: HomeAssistant,
+  climateEntity: string,
+  zoneConfig?: ZoneConfig
+): { entity_id?: string; position?: number; active?: boolean } {
+  const slug = climateZoneSlug(climateEntity);
+  const slugTokens = slug.split('_').filter((t) => t.length > 2);
+  const slugNorm = normalize(slug.replace(/_/g, ' '));
+  const states = hass.states;
+
+  // 1. Check explicit config override
+  if (zoneConfig?.valve_entity) {
+    const state = states[zoneConfig.valve_entity];
+    if (state) {
+      const numVal = parseFloat(state.state);
+      if (!isNaN(numVal)) {
+        return { entity_id: zoneConfig.valve_entity, position: numVal, active: numVal > 0 };
+      }
+      const active = state.state === 'on';
+      return { entity_id: zoneConfig.valve_entity, position: active ? 100 : 0, active };
+    }
+  }
+
+  // 2. Try slug + "valve" matching (existing logic for generic integrations)
+  for (const [eid, state] of Object.entries(states)) {
+    if (!eid.includes(slug) || !eid.includes('valve')) continue;
+    if (eid.startsWith('number.') || eid.startsWith('sensor.')) {
+      const pos = parseFloat(state.state);
+      return { entity_id: eid, position: isNaN(pos) ? undefined : pos, active: !isNaN(pos) && pos > 0 };
+    }
+    if (eid.startsWith('switch.') || eid.startsWith('binary_sensor.')) {
+      const active = state.state === 'on';
+      return { entity_id: eid, position: active ? 100 : 0, active };
+    }
+  }
+
+  // 3. SensorLinx / HBX per-zone floor control (zone calling for hydronic flow)
+  for (const [eid, state] of Object.entries(states)) {
+    if (!eid.startsWith('switch.') || !eid.includes('floor_control_mode')) continue;
+    const suffix = eid.split('floor_control_mode_').pop() ?? '';
+    const suffixNorm = normalize(suffix.replace(/_/g, ' '));
+    const slugMatch =
+      suffixNorm === slugNorm ||
+      normalize(suffix) === normalize(slug) ||
+      suffixNorm === normalize(slug.replace(/_/g, ' '));
+    if (!slugMatch) continue;
+    const active = state.state === 'on';
+    return { entity_id: eid, position: active ? 100 : 0, active };
+  }
+
+  // 4. Redawghome zone relays: aggregate zone valves for this climate slug
+  const redawghomeZones = Object.entries(states).filter(
+    ([eid]) => eid.startsWith('binary_sensor.') && eid.includes('redawghome_zone')
+  );
+  if (redawghomeZones.length) {
+    const climateState = states[climateEntity];
+    const climateName = normalize((climateState?.attributes?.friendly_name as string) ?? '');
+    const climateTokens = climateName
+      .replace(/thm|climate|thermostat/g, '')
+      .trim()
+      .split(/\s+/)
+      .filter((t) => t.length > 2);
+
+    const valveCountEntries = Object.entries(states)
+      .filter(([eid]) => eid.startsWith('number.') && eid.includes('valve_count'))
+      .map(([eid, state]) => ({ eid, state, idNorm: normalize(eid) }))
+      .sort((a, b) => a.idNorm.localeCompare(b.idNorm));
+
+    let valveCount: number | undefined;
+    let zoneOffset = 0;
+    for (const entry of valveCountEntries) {
+      const count = parseFloat(entry.state.state);
+      const matchesSlug =
+        entry.idNorm.includes(slugNorm) ||
+        slugTokens.every((token) => entry.idNorm.includes(normalize(token)));
+      const matchesName = climateTokens.some((token) => entry.idNorm.includes(token));
+      if (matchesSlug || matchesName) {
+        if (!isNaN(count) && count > 0) valveCount = count;
+        break;
+      }
+      if (!isNaN(count) && count > 0) zoneOffset += count;
+    }
+
+    const zoneEntries = redawghomeZones
+      .map(([eid, state]) => {
+        const zoneNum = parseInt(eid.match(/zone_(\d+)/)?.[1] ?? '', 10);
+        return { eid, state, zoneNum };
+      })
+      .filter((z) => !isNaN(z.zoneNum))
+      .sort((a, b) => a.zoneNum - b.zoneNum);
+
+    const assigned =
+      valveCount != null && valveCount > 0
+        ? zoneEntries.slice(zoneOffset, zoneOffset + valveCount)
+        : zoneEntries.filter(({ eid }) => {
+            const idNorm = normalize(eid);
+            return slugTokens.some((token) => idNorm.includes(normalize(token)));
+          });
+
+    if (assigned.length) {
+      const active = assigned.some(({ state }) => state.state === 'on');
+      const primary = assigned.find(({ state }) => state.state === 'on') ?? assigned[0];
+      return {
+        entity_id: primary.eid,
+        position: active ? 100 : 0,
+        active,
+      };
+    }
+  }
+
+  // 5. HBX-style: binary_sensor with device_class running/heat in same area
+  const climateAreaId = entityAreaId(hass, climateEntity);
+  if (climateAreaId) {
+    for (const [eid, state] of Object.entries(states)) {
+      if (!eid.startsWith('binary_sensor.')) continue;
+      const attrs = state.attributes as Record<string, unknown>;
+      const dc = attrs.device_class as string | undefined;
+      if (dc !== 'running' && dc !== 'heat') continue;
+      const icon = attrs.icon as string | undefined;
+      const isValveIcon = icon?.includes('valve') || icon?.includes('pipe');
+      const nameOrId = `${(attrs.friendly_name as string) ?? ''} ${eid}`.toLowerCase();
+      const looksLikeValve =
+        isValveIcon ||
+        nameOrId.includes('valve') ||
+        nameOrId.includes('relay') ||
+        nameOrId.includes('zone') ||
+        eid.includes('redawghome_zone');
+      if (!looksLikeValve) continue;
+
+      const sensorAreaId = entityAreaId(hass, eid);
+      if (sensorAreaId === climateAreaId) {
+        const active = state.state === 'on';
+        return { entity_id: eid, position: active ? 100 : 0, active };
+      }
+    }
+  }
+
+  // 6. Fallback: match by zone name in friendly_name
+  const climateState = states[climateEntity];
+  const climateName = normalize((climateState?.attributes?.friendly_name as string) ?? '');
+  if (climateName) {
+    for (const [eid, state] of Object.entries(states)) {
+      if (!eid.startsWith('binary_sensor.')) continue;
+      const attrs = state.attributes as Record<string, unknown>;
+      const dc = attrs.device_class as string | undefined;
+      if (dc !== 'running' && dc !== 'heat') continue;
+      const friendlyName = normalize((attrs.friendly_name as string) ?? '');
+      const nameTokens = climateName
+        .replace(/thm|climate|thermostat/g, '')
+        .trim()
+        .split(/\s+/)
+        .filter((t) => t.length > 2);
+      const matches = nameTokens.some((token) => friendlyName.includes(token));
+      if (matches) {
+        const active = state.state === 'on';
+        return { entity_id: eid, position: active ? 100 : 0, active };
+      }
+    }
+  }
+
+  return {};
+}
+
 function resolveLinkedSensorIds(
   hass: HomeAssistant,
   zone: ZoneConfig
@@ -443,7 +606,7 @@ function resolveLinkedSensorIds(
 }
 
 function resolveSensors(hass: HomeAssistant, zone: ZoneConfig): ZoneSensors {
-  const links = resolveLinkedSensorIds(hass, zone);
+  const links = resolveLinkedSensorIds(hass, zone) ?? {};
   const floorEntity = getEntity(hass, links.floor);
   const roomEntity = getEntity(hass, links.room);
   const humidityEntity = getEntity(hass, links.humidity);
@@ -656,6 +819,7 @@ export function buildZones(hass: HomeAssistant, config: ClimateCommandCenterConf
     const area_id = zone.area_id ?? entityAreaId(hass, zone.climate_entity);
     const area = zone.area ?? areaName(hass, area_id);
     const linked_sensor_ids = resolveLinkedSensorIds(hass, zone);
+    const valve = resolveValve(hass, zone.climate_entity, zone);
     return {
       name: zone.name,
       climate_entity: zone.climate_entity,
@@ -667,6 +831,9 @@ export function buildZones(hass: HomeAssistant, config: ClimateCommandCenterConf
       roomSensors: [],
       otherSensors: [],
       linked_sensor_ids,
+      valve_entity: valve.entity_id,
+      valve_position: valve.position,
+      valve_active: valve.active,
     };
   });
 }
@@ -833,6 +1000,28 @@ function isPumpActive(entity: HassEntity): boolean {
   return state === 'on' || state === 'running' || state === 'heat' || state === 'heating';
 }
 
+function floorTempSideScore(
+  hint: 'supply' | 'return',
+  name: string,
+  entityId: string
+): number {
+  const haystack = `${normalize(name)} ${normalize(entityId)}`;
+  const hasInlet = haystack.includes('inlet');
+  const hasOutlet = haystack.includes('outlet');
+  let score = 0;
+
+  if (hint === 'supply') {
+    if (hasOutlet) score += 10;
+    if (hasInlet && !hasOutlet) score -= 12;
+    if (entityId.includes('outlet_temp') || entityId.endsWith('outlet_temperature')) score += 6;
+  } else {
+    if (hasInlet) score += 10;
+    if (hasOutlet && !hasInlet) score -= 12;
+    if (entityId.includes('inlet_temp') || entityId.endsWith('inlet_temperature')) score += 6;
+  }
+  return score;
+}
+
 function discoverFloorEntity(
   hass: HomeAssistant,
   hint: 'supply' | 'return' | 'flow' | 'pump',
@@ -870,12 +1059,22 @@ function discoverFloorEntity(
     if (normalize(name).includes('optimal') || normalize(entity.entity_id).includes('optimal')) {
       score += 2;
     }
-    if (hint === 'supply' && normalize(name).includes('supply')) score += 4;
-    if (hint === 'return' && normalize(name).includes('return')) score += 4;
+    if (hint === 'supply' || hint === 'return') {
+      score += floorTempSideScore(hint, name, entity.entity_id);
+    }
+    if (hint === 'supply' && normalize(name).includes('supply')) score += 2;
+    if (hint === 'return' && normalize(name).includes('return')) score += 2;
     if (hint === 'flow' && normalize(name).includes('flow')) score += 4;
-    if (hint === 'pump' && (normalize(name).includes('pump') || normalize(name).includes('boiler'))) {
+    if (
+      hint === 'pump' &&
+      (normalize(name).includes('pump') ||
+        normalize(name).includes('boiler') ||
+        normalize(name).includes('heating'))
+    ) {
       score += 4;
     }
+
+    if (score < 0) continue;
 
     if (!best || score > best.score) {
       best = { id: entity.entity_id, score };
@@ -890,15 +1089,16 @@ export function resolveFloorSystem(
   config: ClimateCommandCenterConfig
 ): FloorSystemData | null {
   const floorConfig = config.floor_system;
-  if (!floorConfig) return null;
+  if (floorConfig === false) return null;
+  const effectiveConfig = floorConfig || { auto_discover: true };
 
   const hasExplicit =
-    floorConfig.supply_temp ||
-    floorConfig.return_temp ||
-    floorConfig.flow_rate ||
-    floorConfig.pump_status ||
-    (floorConfig.extra_sensors?.length ?? 0) > 0;
-  const shouldAutoDiscover = floorConfig.auto_discover || !hasExplicit;
+    effectiveConfig.supply_temp ||
+    effectiveConfig.return_temp ||
+    effectiveConfig.flow_rate ||
+    effectiveConfig.pump_status ||
+    (effectiveConfig.extra_sensors?.length ?? 0) > 0;
+  const shouldAutoDiscover = effectiveConfig.auto_discover || !hasExplicit;
 
   const usedIds = new Set<string>();
   const result: FloorSystemData = {};
@@ -912,13 +1112,13 @@ export function resolveFloorSystem(
     return discoverFloorEntity(hass, hint, usedIds);
   };
 
-  const supplyId = resolveId(floorConfig.supply_temp, 'supply');
+  const supplyId = resolveId(effectiveConfig.supply_temp, 'supply');
   if (supplyId) {
     usedIds.add(supplyId);
     result.supply_temp = metricFromEntity(hass, supplyId);
   }
 
-  const returnId = resolveId(floorConfig.return_temp, 'return');
+  const returnId = resolveId(effectiveConfig.return_temp, 'return');
   if (returnId) {
     usedIds.add(returnId);
     result.return_temp = metricFromEntity(hass, returnId);
@@ -928,13 +1128,13 @@ export function resolveFloorSystem(
     result.delta_t = Math.round((result.supply_temp.value - result.return_temp.value) * 10) / 10;
   }
 
-  const flowId = resolveId(floorConfig.flow_rate, 'flow');
+  const flowId = resolveId(effectiveConfig.flow_rate, 'flow');
   if (flowId) {
     usedIds.add(flowId);
     result.flow_rate = metricFromEntity(hass, flowId);
   }
 
-  const pumpId = resolveId(floorConfig.pump_status, 'pump');
+  const pumpId = resolveId(effectiveConfig.pump_status, 'pump');
   if (pumpId) {
     usedIds.add(pumpId);
     const pumpEntity = getEntity(hass, pumpId);
@@ -944,7 +1144,7 @@ export function resolveFloorSystem(
     }
   }
 
-  const extraIds = floorConfig.extra_sensors ?? [];
+  const extraIds = effectiveConfig.extra_sensors ?? [];
   const extra: FloorSystemData['extra'] = [];
   for (const entityId of extraIds) {
     if (usedIds.has(entityId)) continue;

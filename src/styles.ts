@@ -48,6 +48,18 @@ export const styles: CSSResultGroup = css`
     background: rgba(2, 136, 209, 0.1);
   }
 
+  .setup-save-reminder {
+    font-size: 0.8rem;
+    font-weight: 500;
+    color: var(--primary-text-color);
+    margin: -4px 0 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(255, 152, 0, 0.15);
+    border: 1px solid rgba(255, 152, 0, 0.35);
+    line-height: 1.4;
+  }
+
   .card-title {
     font-size: 1.15rem;
     font-weight: 600;
@@ -537,6 +549,78 @@ export const styles: CSSResultGroup = css`
     color: white;
   }
 
+  /* ── Floor system setup ── */
+  .floor-system-setup {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: rgba(2, 136, 209, 0.06);
+    border: 1px solid rgba(2, 136, 209, 0.15);
+  }
+
+  .floor-system-setup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .floor-system-setup-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--primary-text-color);
+  }
+
+  .floor-system-setup-status {
+    font-size: 0.68rem;
+    color: var(--secondary-text-color);
+    padding: 2px 8px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.06);
+  }
+
+  .floor-system-setup-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 6px 12px;
+  }
+
+  .floor-system-field {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.68rem;
+    color: var(--secondary-text-color);
+  }
+
+  .floor-system-field-label {
+    white-space: nowrap;
+    min-width: 72px;
+  }
+
+  .floor-system-field select {
+    flex: 1;
+    min-width: 0;
+    max-width: 100%;
+    padding: 2px 4px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(0, 0, 0, 0.2);
+    color: var(--primary-text-color);
+    font-size: 0.68rem;
+  }
+
+  .floor-system-disable {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 8px;
+    font-size: 0.68rem;
+    color: var(--secondary-text-color);
+    cursor: pointer;
+  }
+
   .zone-floor-edit,
   .zone-area-edit {
     display: flex;
@@ -597,6 +681,15 @@ export const styles: CSSResultGroup = css`
     border-radius: 8px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .valve-line {
+    padding: 2px 12px 4px;
+  }
+
+  .valve-svg {
+    width: 100%;
+    height: 20px;
   }
 
   .temp-cell {

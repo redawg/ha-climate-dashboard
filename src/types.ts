@@ -7,6 +7,7 @@ export interface ZoneConfig {
   floor_sensor?: string;
   room_sensor?: string;
   humidity_sensor?: string;
+  valve_entity?: string;
 }
 
 export interface FloorConfig {
@@ -59,7 +60,7 @@ export interface ClimateCommandCenterConfig {
   /** Floor plan visualization config */
   floor_plan?: FloorPlanConfig;
   /** Floor heating system config (supply/return temps, flow, etc.) */
-  floor_system?: FloorSystemConfig;
+  floor_system?: FloorSystemConfig | false;
   /** Google Maps Static API key for sun tracker background (optional, uses ESRI satellite if omitted) */
   google_maps_key?: string;
   /** Show sun tracker card */
@@ -98,6 +99,9 @@ export interface ClimateZone {
     room?: string;
     humidity?: string;
   };
+  valve_entity?: string;
+  valve_position?: number;
+  valve_active?: boolean;
 }
 
 export interface FloorSection {
