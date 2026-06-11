@@ -1,4 +1,4 @@
-# HA - Climate Dashboard
+# Climate Command Center
 
 A Home Assistant Lovelace custom card that puts all your temperature controls and data on one screen — heated floors, thermostats, room sensors, and external weather stations (Weatherflow Tempest, etc.).
 
@@ -20,7 +20,7 @@ A Home Assistant Lovelace custom card that puts all your temperature controls an
 
    Repository URL: `https://github.com/redawg/ha-climate-dashboard`
 
-2. Install **HA - Climate Dashboard**
+2. Install **Climate Command Center**
 3. Add the resource (if not auto-added):
 
 ```yaml

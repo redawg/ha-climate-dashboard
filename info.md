@@ -1,20 +1,20 @@
 # Climate Command Center
 
-Unified temperature dashboard for Home Assistant.
+Unified temperature dashboard for Home Assistant — heated floors, thermostats, room sensors, and outdoor weather on one screen.
 
 ## Features
 
 - Auto-discovers climate entities (heated floors + thermostats)
-- Pairs floor, room, and humidity sensors by zone name
+- Pairs floor, room, and humidity sensors by zone name and HA area
 - Weather strip for Tempest / Weatherflow outdoor data
 - Floor grouping with read-only room sensor chips
 - Tap a zone to adjust HVAC mode and setpoint
 
 ## Install
 
-Install via HACS as a **Dashboard** plugin using:
+Install via HACS as a **Dashboard** plugin:
 
-`https://github.com/redawg/lovelace-climate-command-center`
+`https://github.com/redawg/ha-climate-dashboard`
 
 Then add the card:
 

@@ -1,5 +1,5 @@
 {
-  "name": "ha-climate-dashboard",
+  "name": "climate-command-center",
   "version": "0.5.1",
   "type": "module",
   "description": "Unified temperature dashboard for thermostats, heated floors, and weather stations",
