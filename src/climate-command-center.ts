@@ -783,6 +783,12 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     const customImage = fs !== false && fs?.heater_image?.trim() ? fs.heater_image.trim() : undefined;
     const heaterImage = customImage ?? DEFAULT_HEATER_IMAGE;
 
+    const allZones = this.sections.flatMap((s) => s.zones);
+    const anyValveActive = allZones.some((z) =>
+      z.valves?.length ? z.valves.some((v) => v.active) : z.valve_active === true
+    );
+    const systemFlowing = anyValveActive || data.pump_active === true;
+
     const heaterW = 136;
     const heaterH = 136;
     const heaterX = 200 - heaterW / 2;
@@ -896,7 +902,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <path d="M 0,${pipeY + pipeH / 2} L ${leftStubX - 40},${pipeY + pipeH / 2} Q ${leftStubX},${pipeY + pipeH / 2} ${leftStubX},${heaterBottom + 8}"
             fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="${pipeH - 2}" stroke-linecap="round"/>
           <path d="M 3,${pipeY + pipeH / 2} L ${leftStubX - 40},${pipeY + pipeH / 2} Q ${leftStubX},${pipeY + pipeH / 2} ${leftStubX},${heaterBottom + 8}"
-            fill="none" stroke="url(#outletFlow)" stroke-width="${pipeH - 4}" stroke-linecap="round"/>
+            fill="none" stroke="${systemFlowing ? 'url(#outletFlow)' : 'rgba(120,130,150,0.25)'}" stroke-width="${pipeH - 4}" stroke-linecap="round"/>
           <!-- Glass highlight on horizontal section -->
           <path d="M 6,${pipeY + 2} L ${leftStubX - 44},${pipeY + 2}"
             fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2" stroke-linecap="round"/>
@@ -907,7 +913,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <path d="M 400,${pipeY + pipeH / 2} L ${rightStubX + 40},${pipeY + pipeH / 2} Q ${rightStubX},${pipeY + pipeH / 2} ${rightStubX},${heaterBottom + 8}"
             fill="none" stroke="rgba(255,255,255,0.04)" stroke-width="${pipeH - 2}" stroke-linecap="round"/>
           <path d="M 397,${pipeY + pipeH / 2} L ${rightStubX + 40},${pipeY + pipeH / 2} Q ${rightStubX},${pipeY + pipeH / 2} ${rightStubX},${heaterBottom + 8}"
-            fill="none" stroke="url(#inletFlow)" stroke-width="${pipeH - 4}" stroke-linecap="round"/>
+            fill="none" stroke="${systemFlowing ? 'url(#inletFlow)' : 'rgba(120,130,150,0.25)'}" stroke-width="${pipeH - 4}" stroke-linecap="round"/>
           <!-- Glass highlight on horizontal section -->
           <path d="M ${rightStubX + 44},${pipeY + 2} L 394,${pipeY + 2}"
             fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2" stroke-linecap="round"/>
