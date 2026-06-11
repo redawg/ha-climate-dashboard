@@ -1865,7 +1865,7 @@ function e(e,t,r,s){var o,n=arguments.length,i=n<3?t:null===s?s=Object.getOwnPro
             <clipPath id="heaterClip">
               <rect x="${A}" y="${h}" width="${p}" height="${u}" rx="8"/>
             </clipPath>
-            <!-- CFD-style flow: left-pointing arrows for inlet (cold return, flows RIGHT to LEFT toward tank) -->
+            ${d?L`
             <pattern id="inletFlow" x="0" y="0" width="28" height="16" patternUnits="userSpaceOnUse">
               <rect width="28" height="16" fill="${s}" opacity="0.2"/>
               <polygon points="18,8 28,5 28,11" fill="${s}" opacity="0.9">
@@ -1908,6 +1908,7 @@ function e(e,t,r,s){var o,n=arguments.length,i=n<3?t:null===s?s=Object.getOwnPro
                 <animate attributeName="cx" from="30" to="2" dur="1s" repeatCount="indefinite"/>
               </circle>
             </pattern>
+            `:""}
           </defs>
 
           <!-- Pump status indicator (top right) -->

@@ -803,7 +803,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             <clipPath id="heaterClip">
               <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"/>
             </clipPath>
-            <!-- CFD-style flow: left-pointing arrows for inlet (cold return, flows RIGHT to LEFT toward tank) -->
+            ${systemFlowing ? svg`
             <pattern id="inletFlow" x="0" y="0" width="28" height="16" patternUnits="userSpaceOnUse">
               <rect width="28" height="16" fill="${inletColor}" opacity="0.2"/>
               <polygon points="18,8 28,5 28,11" fill="${inletColor}" opacity="0.9">
@@ -846,6 +846,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                 <animate attributeName="cx" from="30" to="2" dur="1s" repeatCount="indefinite"/>
               </circle>
             </pattern>
+            ` : ''}
           </defs>
 
           <!-- Pump status indicator (top right) -->
