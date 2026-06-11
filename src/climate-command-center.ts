@@ -59,34 +59,77 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   @state() private _forecast: ForecastEntry[] | null = null;
 
   private _forecastUnsub?: () => void;
+  private _serverOverrides: Partial<ClimateCommandCenterConfig> = {};
+  private _serverOverridesLoaded = false;
+  private _savePending = false;
 
-  private static readonly STORAGE_KEY = 'climate-command-center-config';
+  private static readonly HA_STORAGE_KEY = 'climate_command_center';
+  private static readonly PERSISTED_KEYS: (keyof ClimateCommandCenterConfig)[] = [
+    'zone_kinds', 'zone_floors', 'sensor_map', 'exclude_entities',
+    'sensor_heights', 'zone_heights', 'floor_system', 'floor_plan',
+  ];
 
   private _persistConfig(config: ClimateCommandCenterConfig): void {
     fireEvent(this, 'config-changed', { config });
-    try {
-      const persisted: Record<string, unknown> = {};
-      const keys: (keyof ClimateCommandCenterConfig)[] = [
-        'zone_kinds', 'zone_floors', 'sensor_map', 'exclude_entities',
-        'sensor_heights', 'zone_heights', 'floor_system', 'floor_plan',
-      ];
-      for (const k of keys) {
-        if (config[k] !== undefined) persisted[k] = config[k];
-      }
-      localStorage.setItem(
-        ClimateCommandCenterCard.STORAGE_KEY,
-        JSON.stringify(persisted),
-      );
-    } catch { /* localStorage unavailable */ }
+    const persisted: Record<string, unknown> = {};
+    for (const k of ClimateCommandCenterCard.PERSISTED_KEYS) {
+      if (config[k] !== undefined) persisted[k] = config[k];
+    }
+    this._serverOverrides = persisted as Partial<ClimateCommandCenterConfig>;
+    this._saveToServer(persisted);
   }
 
-  private static _loadPersistedOverrides(): Partial<ClimateCommandCenterConfig> {
+  private async _saveToServer(data: Record<string, unknown>): Promise<void> {
+    if (!this._hass || this._savePending) return;
+    this._savePending = true;
     try {
-      const raw = localStorage.getItem(ClimateCommandCenterCard.STORAGE_KEY);
-      return raw ? JSON.parse(raw) : {};
-    } catch {
-      return {};
+      await this._hass.callWS({
+        type: 'frontend/set_user_data',
+        key: ClimateCommandCenterCard.HA_STORAGE_KEY,
+        value: data,
+      });
+    } catch (e) {
+      console.warn('climate-command-center: failed to save settings', e);
+    } finally {
+      this._savePending = false;
     }
+  }
+
+  private async _loadFromServer(): Promise<void> {
+    if (!this._hass || this._serverOverridesLoaded) return;
+    this._serverOverridesLoaded = true;
+    try {
+      const resp = await this._hass.callWS<{ value: Record<string, unknown> | null }>({
+        type: 'frontend/get_user_data',
+        key: ClimateCommandCenterCard.HA_STORAGE_KEY,
+      });
+      if (resp?.value && typeof resp.value === 'object') {
+        this._serverOverrides = resp.value as Partial<ClimateCommandCenterConfig>;
+        this._applyOverrides();
+      }
+    } catch (e) {
+      console.warn('climate-command-center: failed to load settings', e);
+    }
+  }
+
+  private _applyOverrides(): void {
+    const s = this._serverOverrides;
+    if (!s || !Object.keys(s).length) return;
+    const merged = { ...this._config };
+    if (s.zone_kinds) merged.zone_kinds = { ...(s.zone_kinds ?? {}), ...(this._config.zone_kinds ?? {}) };
+    if (s.zone_floors) merged.zone_floors = { ...(s.zone_floors ?? {}), ...(this._config.zone_floors ?? {}) };
+    if (s.sensor_map) merged.sensor_map = { ...(s.sensor_map ?? {}), ...(this._config.sensor_map ?? {}) };
+    if (s.sensor_heights) merged.sensor_heights = { ...(s.sensor_heights ?? {}), ...(this._config.sensor_heights ?? {}) };
+    if (s.zone_heights) merged.zone_heights = { ...(s.zone_heights ?? {}), ...(this._config.zone_heights ?? {}) };
+    if (s.exclude_entities && !this._config.exclude_entities?.length) merged.exclude_entities = s.exclude_entities;
+    if (s.floor_system !== undefined && this._config.floor_system === undefined) merged.floor_system = s.floor_system;
+    if (s.floor_plan && !this._config.floor_plan) merged.floor_plan = s.floor_plan;
+    this._config = merged as ClimateCommandCenterConfig;
+    this._floorSystemEntityIds = undefined;
+    if (this._hass) {
+      this._floorSystemEntityIds = discoverFloorSystemEntityIds(this._hass, this._config);
+    }
+    this.requestUpdate();
   }
 
   static get styles(): CSSResultGroup {
@@ -105,6 +148,9 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     }
     if (!this._forecastUnsub && hass) {
       this._subscribeForecast();
+    }
+    if (!this._serverOverridesLoaded && hass) {
+      this._loadFromServer();
     }
     if (!prev || prev !== hass || this._floorSystemStatesChanged(prev, hass) || this._sunStateChanged(prev, hass)) {
       this.requestUpdate();
@@ -134,7 +180,6 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     if (!config.zones?.length && !config.auto_discover) {
       throw new Error('Configure zones or enable auto_discover');
     }
-    const saved = ClimateCommandCenterCard._loadPersistedOverrides();
     this._config = {
       title: 'Climate Command Center',
       auto_discover: true,
@@ -143,13 +188,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       group_by_floor: true,
       allow_sensor_reassign: true,
       reference_height_ft: 5,
-      ...saved,
       ...config,
-      zone_kinds: { ...(saved.zone_kinds ?? {}), ...(config.zone_kinds ?? {}) },
-      zone_floors: { ...(saved.zone_floors ?? {}), ...(config.zone_floors ?? {}) },
-      sensor_map: { ...(saved.sensor_map ?? {}), ...(config.sensor_map ?? {}) },
-      sensor_heights: { ...(saved.sensor_heights ?? {}), ...(config.sensor_heights ?? {}) },
-      zone_heights: { ...(saved.zone_heights ?? {}), ...(config.zone_heights ?? {}) },
       floors: config.floors?.length ? config.floors : DEFAULT_FLOORS,
     };
     this._floorSystemEntityIds = undefined;
