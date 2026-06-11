@@ -574,93 +574,102 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     if (!sun) return null;
 
     const isUp = sun.state === 'above_horizon';
+    const cx = 200;
+    const cy = 95;
+    const rx = 170;
+    const ry = 75;
 
-    // Use azimuth for horizontal position (E=90° on left, S=180° center, W=270° right)
-    // Facing south: east is left, west is right (standard sun path diagram)
-    const azNorm = Math.max(0, Math.min(1, (sun.azimuth - 45) / 270));
-    // Use elevation for vertical position (higher elevation = higher on arc)
-    const maxElev = 90;
-    const elevNorm = Math.max(0, sun.elevation) / maxElev;
-
-    // Arc points based on azimuth sweep (45° to 315°)
-    const arcPoints: string[] = [];
-    for (let i = 0; i <= 100; i++) {
-      const t = i / 100;
-      const x = 4 + t * 92;
-      const y = 88 - Math.sin(t * Math.PI) * 55;
-      arcPoints.push(`${x},${y}`);
+    // Build semicircular arc points (east to west, 180° sweep)
+    // Azimuth 90°=E (left), 180°=S (bottom of arc = top of sky), 270°=W (right)
+    const arcPts: Array<{ x: number; y: number }> = [];
+    for (let i = 0; i <= 120; i++) {
+      const angle = Math.PI + (i / 120) * Math.PI; // PI to 2*PI (bottom half of ellipse = sky dome)
+      arcPts.push({
+        x: cx + rx * Math.cos(angle),
+        y: cy + ry * Math.sin(angle),
+      });
     }
-    const arcPath = `M ${arcPoints.join(' L ')}`;
+    const arcPath = `M ${arcPts.map((p) => `${p.x},${p.y}`).join(' L ')}`;
 
-    // Sun position: x from azimuth, y from elevation
-    const sunX = 4 + azNorm * 92;
-    const sunY = isUp ? 88 - elevNorm * 55 : 95;
+    // Sun position on the arc using azimuth (90°=E to 270°=W mapped to 0..1)
+    const azProgress = Math.max(0, Math.min(1, (sun.azimuth - 60) / 240));
+    const sunAngle = Math.PI + azProgress * Math.PI;
+    const sunPx = cx + rx * Math.cos(sunAngle);
+    const sunPy = cy + ry * Math.sin(sunAngle);
+
+    // Sunrise/sunset marker positions
+    const riseIdx = 0;
+    const setIdx = arcPts.length - 1;
+    const risePt = arcPts[riseIdx];
+    const setPt = arcPts[setIdx];
+
+    // Traveled arc (sunrise to current position)
+    const travelIdx = Math.round(azProgress * 120);
+    const traveledPath = `M ${arcPts.slice(0, Math.min(travelIdx + 1, arcPts.length)).map((p) => `${p.x},${p.y}`).join(' L ')}`;
 
     const fmt = (d: Date) =>
       d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
     const riseTime = fmt(sun.rising);
     const setTime = fmt(sun.setting);
+    const nowTime = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 
     const hrs = Math.floor(sun.remaining_minutes / 60);
     const mins = sun.remaining_minutes % 60;
-    const remaining = isUp ? `${hrs}h ${mins}m left` : 'Night';
+    const remaining = isUp ? `${hrs}h ${mins}m` : '';
 
     return html`
       <div class="sun-tracker">
-        <svg class="sun-tracker-svg" viewBox="0 0 400 55">
+        <svg class="sun-tracker-svg" viewBox="0 0 400 110">
           <defs>
-            <linearGradient id="skyBg" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="${isUp ? 'rgba(25,118,210,0.35)' : 'rgba(20,20,60,0.6)'}" />
-              <stop offset="100%" stop-color="${isUp ? 'rgba(255,183,77,0.08)' : 'rgba(30,30,80,0.2)'}" />
-            </linearGradient>
-            <radialGradient id="sunG">
-              <stop offset="0%" stop-color="rgba(255,235,59,0.9)" />
-              <stop offset="60%" stop-color="rgba(255,193,7,0.3)" />
-              <stop offset="100%" stop-color="rgba(255,193,7,0)" />
+            <radialGradient id="sunG" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="rgba(255,235,59,0.95)"/>
+              <stop offset="40%" stop-color="rgba(255,193,7,0.4)"/>
+              <stop offset="100%" stop-color="rgba(255,193,7,0)"/>
             </radialGradient>
-            <linearGradient id="arcG" x1="0" y1="0" x2="1" y2="0">
-              <stop offset="0%" stop-color="rgba(255,183,77,0.5)" />
-              <stop offset="50%" stop-color="rgba(255,235,59,0.7)" />
-              <stop offset="100%" stop-color="rgba(255,138,80,0.5)" />
+            <linearGradient id="arcTraveled" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="rgba(255,183,77,0.7)"/>
+              <stop offset="50%" stop-color="rgba(255,235,59,0.9)"/>
+              <stop offset="100%" stop-color="rgba(255,183,77,0.7)"/>
             </linearGradient>
           </defs>
 
-          <rect x="0" y="0" width="400" height="55" rx="7" fill="url(#skyBg)" />
-          <line x1="16" y1="48" x2="384" y2="48" stroke="rgba(255,255,255,0.15)" stroke-width="0.5" stroke-dasharray="3,2"/>
+          <!-- Horizon line -->
+          <line x1="20" y1="${cy}" x2="380" y2="${cy}" stroke="rgba(255,255,255,0.12)" stroke-width="0.5"/>
 
-          <!-- Full arc (dashed) -->
-          <path d="${arcPath}" fill="none" stroke="rgba(255,235,59,0.15)" stroke-width="0.6" stroke-dasharray="2,1.5"
-                transform="scale(4,0.55) translate(0,0)"/>
+          <!-- Full arc path (dashed) -->
+          <path d="${arcPath}" fill="none" stroke="rgba(255,235,59,0.15)" stroke-width="1" stroke-dasharray="4,3"/>
 
-          <!-- Traveled arc -->
-          ${isUp ? html`
-            <path d="M ${arcPoints.slice(0, Math.round(azNorm * 100) + 1).join(' L ')}"
-                  fill="none" stroke="url(#arcG)" stroke-width="0.8"
-                  transform="scale(4,0.55) translate(0,0)"/>
+          <!-- Traveled arc (solid golden) -->
+          ${isUp && travelIdx > 0 ? html`
+            <path d="${traveledPath}" fill="none" stroke="url(#arcTraveled)" stroke-width="1.8"/>
           ` : ''}
 
-          <!-- Sun / Moon -->
+          <!-- Sunrise marker -->
+          <circle cx="${risePt.x}" cy="${risePt.y}" r="3" fill="#FFB74D" opacity="0.8"/>
+          <text x="${risePt.x}" y="${risePt.y + 12}" font-size="7" fill="#FFB74D" font-family="sans-serif" font-weight="600" text-anchor="middle">${riseTime}</text>
+
+          <!-- Sunset marker -->
+          <circle cx="${setPt.x}" cy="${setPt.y}" r="3" fill="#FF8A50" opacity="0.8"/>
+          <text x="${setPt.x}" y="${setPt.y + 12}" font-size="7" fill="#FF8A50" font-family="sans-serif" font-weight="600" text-anchor="middle">${setTime}</text>
+
+          <!-- Sun glow + sun disc -->
           ${isUp ? html`
-            <circle cx="${sunX * 4}" cy="${sunY * 0.55}" r="12" fill="url(#sunG)"/>
-            <circle cx="${sunX * 4}" cy="${sunY * 0.55}" r="4" fill="#FFD54F" stroke="#FFF176" stroke-width="0.5"/>
+            <circle cx="${sunPx}" cy="${sunPy}" r="16" fill="url(#sunG)"/>
+            <circle cx="${sunPx}" cy="${sunPy}" r="5.5" fill="#FFD54F" stroke="#FFF59D" stroke-width="0.8"/>
+            <!-- Time label near sun -->
+            <text x="${sunPx}" y="${sunPy - 12}" font-size="7.5" fill="white" font-family="sans-serif" font-weight="700" text-anchor="middle">${nowTime}</text>
           ` : html`
-            <circle cx="200" cy="20" r="3.5" fill="rgba(200,200,220,0.7)" stroke="rgba(255,255,255,0.2)" stroke-width="0.4"/>
+            <circle cx="${cx}" cy="${cy - 30}" r="4" fill="rgba(200,200,220,0.6)" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
           `}
 
-          <!-- E/W compass labels -->
-          <text x="10" y="46" font-size="7" fill="rgba(255,255,255,0.35)" font-family="sans-serif" font-weight="600">E</text>
-          <text x="196" y="10" font-size="7" fill="rgba(255,255,255,0.25)" font-family="sans-serif" font-weight="600" text-anchor="middle">S</text>
-          <text x="390" y="46" font-size="7" fill="rgba(255,255,255,0.35)" font-family="sans-serif" font-weight="600" text-anchor="end">W</text>
+          <!-- Compass labels -->
+          <text x="18" y="${cy - 2}" font-size="8" fill="rgba(255,255,255,0.4)" font-family="sans-serif" font-weight="700">E</text>
+          <text x="${cx}" y="10" font-size="8" fill="rgba(255,255,255,0.3)" font-family="sans-serif" font-weight="700" text-anchor="middle">S</text>
+          <text x="382" y="${cy - 2}" font-size="8" fill="rgba(255,255,255,0.4)" font-family="sans-serif" font-weight="700" text-anchor="end">W</text>
 
-          <!-- Sunrise label -->
-          <text x="22" y="13" font-size="8" fill="#FFB74D" font-family="sans-serif" font-weight="600">↗ ${riseTime}</text>
-
-          <!-- Sunset label -->
-          <text x="378" y="13" font-size="8" fill="#FF8A50" font-family="sans-serif" font-weight="600" text-anchor="end">${setTime} ↘</text>
-
-          <!-- Center info -->
-          <text x="200" y="46" font-size="8" fill="rgba(255,255,255,0.6)" font-family="sans-serif" text-anchor="middle">
-            ${isUp ? `${Math.round(sun.elevation)}° · ${remaining}` : 'Night'}
+          <!-- Elevation + remaining -->
+          <text x="${cx}" y="${cy + 12}" font-size="7.5" fill="rgba(255,255,255,0.5)" font-family="sans-serif" text-anchor="middle">
+            ${isUp ? `Elev ${Math.round(sun.elevation)}°${remaining ? ` · ${remaining} left` : ''}` : 'Below horizon'}
           </text>
         </svg>
       </div>
