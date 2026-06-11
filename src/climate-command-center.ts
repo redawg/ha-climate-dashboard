@@ -711,30 +711,9 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       <div class="floor-system tankless-visual">
         <svg class="tankless-svg" viewBox="0 0 400 180" preserveAspectRatio="xMidYMid meet">
           <defs>
-            <linearGradient id="heaterBodyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stop-color="#f8f8f8"/>
-              <stop offset="45%" stop-color="#ececec"/>
-              <stop offset="100%" stop-color="#d4d4d4"/>
-            </linearGradient>
-            <linearGradient id="heaterEdgeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-              <stop offset="0%" stop-color="rgba(255,255,255,0.5)"/>
-              <stop offset="100%" stop-color="rgba(0,0,0,0.08)"/>
-            </linearGradient>
-            <radialGradient id="heatGlow" cx="50%" cy="70%" r="60%">
-              <stop offset="0%" stop-color="#ff7043" stop-opacity="0.45"/>
-              <stop offset="70%" stop-color="#ff9800" stop-opacity="0.15"/>
-              <stop offset="100%" stop-color="#ff9800" stop-opacity="0"/>
-            </radialGradient>
             <clipPath id="heaterClip">
               <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"/>
             </clipPath>
-            <!-- Glass pipe gradient for transparent look -->
-            <linearGradient id="pipeGlass" x1="0%" y1="0%" x2="0%" y2="100%">
-              <stop offset="0%" stop-color="rgba(255,255,255,0.25)"/>
-              <stop offset="30%" stop-color="rgba(255,255,255,0.05)"/>
-              <stop offset="70%" stop-color="rgba(0,0,0,0.08)"/>
-              <stop offset="100%" stop-color="rgba(255,255,255,0.12)"/>
-            </linearGradient>
             <!-- CFD-style flow: dense arrow-like streaks for inlet (cold return, flows LEFT to RIGHT) -->
             <pattern id="inletFlow" x="0" y="0" width="32" height="16" patternUnits="userSpaceOnUse">
               <!-- Core fast stream (center) -->
@@ -805,7 +784,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <!-- Unit shadow -->
           <ellipse cx="200" cy="${heaterBottom + 3}" rx="92" ry="4" fill="rgba(0,0,0,0.28)"/>
 
-          <!-- Heater unit: custom image or default illustration -->
+          <!-- Heater unit -->
           ${heaterImage
             ? html`
                 <image
@@ -817,92 +796,43 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                   clip-path="url(#heaterClip)"
                   preserveAspectRatio="xMidYMid meet"
                 />
-                <rect
-                  x="${heaterX}"
-                  y="${heaterY}"
-                  width="${heaterW}"
-                  height="${heaterH}"
-                  rx="8"
-                  fill="none"
-                  stroke="rgba(255,255,255,0.15)"
-                  stroke-width="1"
-                />
+                <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"
+                  fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
               `
-            : html`
-                <rect
-                  x="${heaterX}"
-                  y="${heaterY}"
-                  width="${heaterW}"
-                  height="${heaterH}"
-                  rx="8"
-                  fill="url(#heaterBodyGrad)"
-                  stroke="#b8b8b8"
-                  stroke-width="1"
-                />
-                <rect
-                  x="${heaterX}"
-                  y="${heaterY}"
-                  width="${heaterW}"
-                  height="${heaterH}"
-                  rx="8"
-                  fill="url(#heaterEdgeGrad)"
-                  opacity="0.35"
-                />
-                ${data.pump_active
-                  ? html`
-                      <rect
-                        x="${heaterX + 8}"
-                        y="${heaterY + 20}"
-                        width="${heaterW - 16}"
-                        height="${heaterH - 32}"
-                        rx="6"
-                        fill="url(#heatGlow)"
-                      />
-                    `
-                  : ''}
-                <!-- Display cutout top-right -->
-                <circle cx="265" cy="58" r="15" fill="#1e1e2e" stroke="#c0c0c0" stroke-width="1"/>
-                <circle cx="265" cy="58" r="12" fill="#0d0d18" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
-                <text
-                  x="265"
-                  y="${data.set_temp != null ? '56' : '61'}"
-                  font-size="9"
-                  text-anchor="middle"
-                  fill="#ffb74d"
-                  font-family="sans-serif"
-                  font-weight="700"
-                >${data.set_temp != null ? `${data.set_temp}°` : outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
-                ${data.set_temp != null ? html`
-                  <text
-                    x="265"
-                    y="65"
-                    font-size="5"
-                    text-anchor="middle"
-                    fill="rgba(255,255,255,0.4)"
-                    font-family="sans-serif"
-                    font-weight="600"
-                  >SET</text>
-                ` : ''}
-                <text
-                  x="200"
-                  y="88"
-                  font-size="6.5"
-                  text-anchor="middle"
-                  fill="rgba(0,0,0,0.22)"
-                  font-family="sans-serif"
-                  font-weight="600"
-                  letter-spacing="0.6"
-                >TANKLESS</text>
-                <text
-                  x="200"
-                  y="98"
-                  font-size="5.5"
-                  text-anchor="middle"
-                  fill="rgba(0,0,0,0.18)"
-                  font-family="sans-serif"
-                  letter-spacing="0.4"
-                >WATER HEATER</text>
-              `}
+            : ''}
+          <!-- Body: main panel -->
+          ${!heaterImage ? html`
+            <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"
+              fill="#e8e8e8" stroke="#b0b0b0" stroke-width="1"/>
+            <!-- Top highlight -->
+            <rect x="${heaterX + 1}" y="${heaterY + 1}" width="${heaterW - 2}" height="28" rx="7"
+              fill="rgba(255,255,255,0.35)"/>
+            <!-- Bottom shadow -->
+            <rect x="${heaterX + 1}" y="${heaterY + heaterH - 18}" width="${heaterW - 2}" height="17" rx="7"
+              fill="rgba(0,0,0,0.06)"/>
+            <!-- Heat glow when active -->
+            ${data.pump_active ? html`
+              <rect x="${heaterX + 10}" y="${heaterY + 28}" width="${heaterW - 20}" height="${heaterH - 42}" rx="6"
+                fill="rgba(255,120,50,0.18)"/>
+            ` : ''}
+          ` : ''}
+          <!-- Display circle (always shown) -->
+          <circle cx="265" cy="58" r="16" fill="#1a1a2e" stroke="#aaa" stroke-width="1.2"/>
+          <circle cx="265" cy="58" r="13" fill="#0a0a1a" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
+          <text x="265" y="${data.set_temp != null ? '56' : '61'}" font-size="10" text-anchor="middle"
+            fill="#ffb74d" font-family="sans-serif" font-weight="700"
+          >${data.set_temp != null ? `${data.set_temp}°` : outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
+          ${data.set_temp != null ? html`
+            <text x="265" y="66" font-size="5.5" text-anchor="middle" fill="rgba(255,255,255,0.45)"
+              font-family="sans-serif" font-weight="600">SET</text>
+          ` : ''}
+          <!-- Unit label -->
+          ${!heaterImage ? html`
+            <text x="185" y="90" font-size="7" text-anchor="middle" fill="rgba(80,80,80,0.5)"
+              font-family="sans-serif" font-weight="600" letter-spacing="0.6">TANKLESS</text>
+            <text x="185" y="100" font-size="5.5" text-anchor="middle" fill="rgba(80,80,80,0.35)"
+              font-family="sans-serif" letter-spacing="0.4">WATER HEATER</text>
+          ` : ''}
 
           <!-- Copper connection stubs at bottom -->
           <rect x="${leftStubX - 7}" y="${heaterBottom - 2}" width="14" height="10" rx="2" fill="#b87333" stroke="#8b5a2b" stroke-width="0.5"/>
@@ -915,18 +845,20 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <rect x="${rightStubX - 3}" y="${heaterBottom + 8}" width="6" height="${pipeY - heaterBottom - 8}" rx="3" fill="url(#inletFlow)"/>
 
           <!-- Outlet pipe (hot supply) — transparent glass pipe with CFD flow, extends LEFT -->
-          <rect x="0" y="${pipeY}" width="${leftStubX + 5}" height="${pipeH}" rx="7" fill="rgba(255,255,255,0.06)" stroke="rgba(200,200,210,0.35)" stroke-width="0.8"/>
-          <rect x="0" y="${pipeY}" width="${leftStubX + 5}" height="${pipeH}" rx="7" fill="url(#pipeGlass)"/>
-          <rect x="3" y="${pipeY + 2}" width="${leftStubX - 1}" height="${pipeH - 4}" rx="5" fill="url(#outletFlow)"/>
-          <!-- Glass highlight streak -->
-          <rect x="8" y="${pipeY + 1}" width="${leftStubX - 10}" height="2" rx="1" fill="rgba(255,255,255,0.15)"/>
+          <rect x="0" y="${pipeY}" width="${leftStubX + 5}" height="${pipeH}" rx="7"
+            fill="rgba(255,255,255,0.06)" stroke="rgba(200,200,210,0.35)" stroke-width="0.8"/>
+          <rect x="3" y="${pipeY + 2}" width="${leftStubX - 1}" height="${pipeH - 4}" rx="5"
+            fill="url(#outletFlow)"/>
+          <rect x="6" y="${pipeY + 1}" width="${leftStubX - 6}" height="2.5" rx="1"
+            fill="rgba(255,255,255,0.12)"/>
 
           <!-- Inlet pipe (cold return) — transparent glass pipe with CFD flow, extends RIGHT -->
-          <rect x="${rightStubX - 5}" y="${pipeY}" width="${400 - rightStubX + 5}" height="${pipeH}" rx="7" fill="rgba(255,255,255,0.06)" stroke="rgba(200,200,210,0.35)" stroke-width="0.8"/>
-          <rect x="${rightStubX - 5}" y="${pipeY}" width="${400 - rightStubX + 5}" height="${pipeH}" rx="7" fill="url(#pipeGlass)"/>
-          <rect x="${rightStubX - 1}" y="${pipeY + 2}" width="${400 - rightStubX - 3}" height="${pipeH - 4}" rx="5" fill="url(#inletFlow)"/>
-          <!-- Glass highlight streak -->
-          <rect x="${rightStubX + 2}" y="${pipeY + 1}" width="${400 - rightStubX - 10}" height="2" rx="1" fill="rgba(255,255,255,0.15)"/>
+          <rect x="${rightStubX - 5}" y="${pipeY}" width="${400 - rightStubX + 5}" height="${pipeH}" rx="7"
+            fill="rgba(255,255,255,0.06)" stroke="rgba(200,200,210,0.35)" stroke-width="0.8"/>
+          <rect x="${rightStubX - 1}" y="${pipeY + 2}" width="${400 - rightStubX - 3}" height="${pipeH - 4}" rx="5"
+            fill="url(#inletFlow)"/>
+          <rect x="${rightStubX + 2}" y="${pipeY + 1}" width="${400 - rightStubX - 8}" height="2.5" rx="1"
+            fill="rgba(255,255,255,0.12)"/>
 
           <!-- Hot output temp label (left) -->
           <text x="42" y="${pipeY - 4}" font-size="11" text-anchor="middle" fill="${outletColor}" font-family="sans-serif" font-weight="700">${outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
