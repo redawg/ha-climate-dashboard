@@ -728,22 +728,61 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             <clipPath id="heaterClip">
               <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"/>
             </clipPath>
-            <!-- Animated flow particles for inlet (cold return) pipe — flows right into unit -->
-            <pattern id="inletFlow" x="0" y="0" width="20" height="10" patternUnits="userSpaceOnUse">
-              <circle r="2.5" cx="5" cy="5" fill="${inletColor}" opacity="0.7">
-                <animate attributeName="cx" from="-5" to="25" dur="1.2s" repeatCount="indefinite"/>
+            <!-- Glass pipe gradient for transparent look -->
+            <linearGradient id="pipeGlass" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="rgba(255,255,255,0.25)"/>
+              <stop offset="30%" stop-color="rgba(255,255,255,0.05)"/>
+              <stop offset="70%" stop-color="rgba(0,0,0,0.08)"/>
+              <stop offset="100%" stop-color="rgba(255,255,255,0.12)"/>
+            </linearGradient>
+            <!-- CFD-style flow: dense arrow-like streaks for inlet (cold return, flows LEFT to RIGHT) -->
+            <pattern id="inletFlow" x="0" y="0" width="32" height="16" patternUnits="userSpaceOnUse">
+              <!-- Core fast stream (center) -->
+              <polygon points="0,7 8,5 8,9" fill="${inletColor}" opacity="0.8">
+                <animate attributeName="points" values="0,7 8,5 8,9;32,7 40,5 40,9" dur="1.1s" repeatCount="indefinite"/>
+              </polygon>
+              <polygon points="10,8 18,6 18,10" fill="${inletColor}" opacity="0.65">
+                <animate attributeName="points" values="10,8 18,6 18,10;42,8 50,6 50,10" dur="1.1s" repeatCount="indefinite"/>
+              </polygon>
+              <!-- Upper boundary layer (slower) -->
+              <polygon points="4,3 10,2 10,4" fill="${inletColor}" opacity="0.35">
+                <animate attributeName="points" values="4,3 10,2 10,4;36,3 42,2 42,4" dur="1.5s" repeatCount="indefinite"/>
+              </polygon>
+              <!-- Lower boundary layer (slower) -->
+              <polygon points="16,13 22,12 22,14" fill="${inletColor}" opacity="0.35">
+                <animate attributeName="points" values="16,13 22,12 22,14;48,13 54,12 54,14" dur="1.5s" repeatCount="indefinite"/>
+              </polygon>
+              <!-- Mid-stream particles -->
+              <circle r="1.2" cx="24" cy="6" fill="${inletColor}" opacity="0.5">
+                <animate attributeName="cx" from="-4" to="28" dur="1.1s" repeatCount="indefinite"/>
               </circle>
-              <circle r="1.8" cx="15" cy="5" fill="${inletColor}" opacity="0.5">
-                <animate attributeName="cx" from="5" to="35" dur="1.2s" repeatCount="indefinite"/>
+              <circle r="1" cx="6" cy="11" fill="${inletColor}" opacity="0.4">
+                <animate attributeName="cx" from="-2" to="30" dur="1.4s" repeatCount="indefinite"/>
               </circle>
             </pattern>
-            <!-- Animated flow particles for outlet (hot supply) pipe — flows left out of unit -->
-            <pattern id="outletFlow" x="0" y="0" width="20" height="10" patternUnits="userSpaceOnUse">
-              <circle r="2.5" cx="5" cy="5" fill="${outletColor}" opacity="0.7">
-                <animate attributeName="cx" from="25" to="-5" dur="0.9s" repeatCount="indefinite"/>
+            <!-- CFD-style flow: dense arrow-like streaks for outlet (hot supply, flows RIGHT to LEFT) -->
+            <pattern id="outletFlow" x="0" y="0" width="32" height="16" patternUnits="userSpaceOnUse">
+              <!-- Core fast stream (center) — reversed arrows -->
+              <polygon points="32,7 24,5 24,9" fill="${outletColor}" opacity="0.85">
+                <animate attributeName="points" values="32,7 24,5 24,9;0,7 -8,5 -8,9" dur="0.8s" repeatCount="indefinite"/>
+              </polygon>
+              <polygon points="22,8 14,6 14,10" fill="${outletColor}" opacity="0.7">
+                <animate attributeName="points" values="22,8 14,6 14,10;-10,8 -18,6 -18,10" dur="0.8s" repeatCount="indefinite"/>
+              </polygon>
+              <!-- Upper boundary layer -->
+              <polygon points="28,3 22,2 22,4" fill="${outletColor}" opacity="0.4">
+                <animate attributeName="points" values="28,3 22,2 22,4;-4,3 -10,2 -10,4" dur="1.1s" repeatCount="indefinite"/>
+              </polygon>
+              <!-- Lower boundary layer -->
+              <polygon points="16,13 10,12 10,14" fill="${outletColor}" opacity="0.4">
+                <animate attributeName="points" values="16,13 10,12 10,14;-16,13 -22,12 -22,14" dur="1.1s" repeatCount="indefinite"/>
+              </polygon>
+              <!-- Mid-stream particles -->
+              <circle r="1.2" cx="8" cy="6" fill="${outletColor}" opacity="0.55">
+                <animate attributeName="cx" from="36" to="4" dur="0.8s" repeatCount="indefinite"/>
               </circle>
-              <circle r="1.8" cx="15" cy="5" fill="${outletColor}" opacity="0.5">
-                <animate attributeName="cx" from="35" to="5" dur="0.9s" repeatCount="indefinite"/>
+              <circle r="1" cx="26" cy="11" fill="${outletColor}" opacity="0.45">
+                <animate attributeName="cx" from="34" to="2" dur="1s" repeatCount="indefinite"/>
               </circle>
             </pattern>
           </defs>
@@ -869,17 +908,25 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <rect x="${leftStubX - 7}" y="${heaterBottom - 2}" width="14" height="10" rx="2" fill="#b87333" stroke="#8b5a2b" stroke-width="0.5"/>
           <rect x="${rightStubX - 7}" y="${heaterBottom - 2}" width="14" height="10" rx="2" fill="#b87333" stroke="#8b5a2b" stroke-width="0.5"/>
 
-          <!-- Vertical drops to horizontal pipes -->
-          <path d="M ${leftStubX} ${heaterBottom + 8} L ${leftStubX} ${pipeY + pipeH / 2}" fill="none" stroke="${outletColor}" stroke-width="2" opacity="0.65"/>
-          <path d="M ${rightStubX} ${heaterBottom + 8} L ${rightStubX} ${pipeY + pipeH / 2}" fill="none" stroke="${inletColor}" stroke-width="2" opacity="0.65"/>
+          <!-- Vertical drops — glass pipe sections -->
+          <rect x="${leftStubX - 5}" y="${heaterBottom + 6}" width="10" height="${pipeY - heaterBottom - 4}" rx="5" fill="rgba(255,255,255,0.06)" stroke="rgba(200,200,210,0.35)" stroke-width="0.8"/>
+          <rect x="${leftStubX - 3}" y="${heaterBottom + 8}" width="6" height="${pipeY - heaterBottom - 8}" rx="3" fill="url(#outletFlow)"/>
+          <rect x="${rightStubX - 5}" y="${heaterBottom + 6}" width="10" height="${pipeY - heaterBottom - 4}" rx="5" fill="rgba(255,255,255,0.06)" stroke="rgba(200,200,210,0.35)" stroke-width="0.8"/>
+          <rect x="${rightStubX - 3}" y="${heaterBottom + 8}" width="6" height="${pipeY - heaterBottom - 8}" rx="3" fill="url(#inletFlow)"/>
 
-          <!-- Outlet pipe (hot supply) — extends LEFT from bottom-left -->
-          <rect x="0" y="${pipeY}" width="${leftStubX}" height="${pipeH}" rx="7" fill="rgba(255,183,77,0.12)" stroke="${outletColor}" stroke-width="1.5"/>
-          <rect x="4" y="${pipeY + 2}" width="${leftStubX - 8}" height="${pipeH - 4}" rx="5" fill="url(#outletFlow)"/>
+          <!-- Outlet pipe (hot supply) — transparent glass pipe with CFD flow, extends LEFT -->
+          <rect x="0" y="${pipeY}" width="${leftStubX + 5}" height="${pipeH}" rx="7" fill="rgba(255,255,255,0.06)" stroke="rgba(200,200,210,0.35)" stroke-width="0.8"/>
+          <rect x="0" y="${pipeY}" width="${leftStubX + 5}" height="${pipeH}" rx="7" fill="url(#pipeGlass)"/>
+          <rect x="3" y="${pipeY + 2}" width="${leftStubX - 1}" height="${pipeH - 4}" rx="5" fill="url(#outletFlow)"/>
+          <!-- Glass highlight streak -->
+          <rect x="8" y="${pipeY + 1}" width="${leftStubX - 10}" height="2" rx="1" fill="rgba(255,255,255,0.15)"/>
 
-          <!-- Inlet pipe (cold return) — extends RIGHT from bottom-right -->
-          <rect x="${rightStubX}" y="${pipeY}" width="${400 - rightStubX}" height="${pipeH}" rx="7" fill="rgba(100,181,246,0.12)" stroke="${inletColor}" stroke-width="1.5"/>
-          <rect x="${rightStubX + 4}" y="${pipeY + 2}" width="${400 - rightStubX - 8}" height="${pipeH - 4}" rx="5" fill="url(#inletFlow)"/>
+          <!-- Inlet pipe (cold return) — transparent glass pipe with CFD flow, extends RIGHT -->
+          <rect x="${rightStubX - 5}" y="${pipeY}" width="${400 - rightStubX + 5}" height="${pipeH}" rx="7" fill="rgba(255,255,255,0.06)" stroke="rgba(200,200,210,0.35)" stroke-width="0.8"/>
+          <rect x="${rightStubX - 5}" y="${pipeY}" width="${400 - rightStubX + 5}" height="${pipeH}" rx="7" fill="url(#pipeGlass)"/>
+          <rect x="${rightStubX - 1}" y="${pipeY + 2}" width="${400 - rightStubX - 3}" height="${pipeH - 4}" rx="5" fill="url(#inletFlow)"/>
+          <!-- Glass highlight streak -->
+          <rect x="${rightStubX + 2}" y="${pipeY + 1}" width="${400 - rightStubX - 10}" height="2" rx="1" fill="rgba(255,255,255,0.15)"/>
 
           <!-- Hot output temp label (left) -->
           <text x="42" y="${pipeY - 4}" font-size="11" text-anchor="middle" fill="${outletColor}" font-family="sans-serif" font-weight="700">${outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
