@@ -1,4 +1,4 @@
-import { CSSResultGroup, html, LitElement, TemplateResult } from 'lit';
+import { CSSResultGroup, html, svg, LitElement, TemplateResult } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import { HomeAssistant, LovelaceCard, LovelaceCardEditor } from 'custom-card-helpers';
 import { fireEvent } from './utils/fire-event';
@@ -744,7 +744,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
 
     return html`
       <div class="floor-system tankless-visual">
-        <svg class="tankless-svg" viewBox="0 0 400 210" preserveAspectRatio="xMidYMid meet">
+        <svg class="tankless-svg" viewBox="0 0 400 230" preserveAspectRatio="xMidYMid meet">
           <defs>
             <clipPath id="heaterClip">
               <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"/>
@@ -794,14 +794,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             </pattern>
           </defs>
 
-          <!-- Flow rate above heater -->
-          ${data.flow_rate
-            ? html`
-                <text x="200" y="22" font-size="8" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="sans-serif">Flow: ${data.flow_rate.value} ${data.flow_rate.unit}</text>
-              `
-            : ''}
-
-          <!-- Pump status indicator -->
+          <!-- Pump status indicator (top right) -->
           ${data.pump_entity != null
             ? html`
                 <circle cx="385" cy="18" r="5" fill="${data.pump_active ? '#4caf50' : '#616161'}"/>
@@ -868,13 +861,24 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <text x="358" y="${pipeY - 4}" font-size="11" text-anchor="middle" fill="${inletColor}" font-family="sans-serif" font-weight="700">${inletTemp != null ? `${inletTemp}${inletUnit}` : '—'}</text>
           <text x="358" y="${pipeY + pipeH + 12}" font-size="7" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-family="sans-serif" font-weight="600">COLD INPUT</text>
 
-          <!-- Delta T badge centered below pipes -->
-          ${data.delta_t != null
-            ? html`
-                <rect x="170" y="${pipeY + pipeH + 14}" width="60" height="16" rx="8" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="0.8"/>
-                <text x="200" y="${pipeY + pipeH + 26}" font-size="9" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="sans-serif" font-weight="600">ΔT ${data.delta_t}°</text>
-              `
-            : ''}
+          <!-- Stats row below pipes -->
+          ${(() => {
+            const statsY = pipeY + pipeH + 18;
+            const stats: Array<{ label: string; value: string; color: string }> = [];
+            if (data.flow_rate) stats.push({ label: 'FLOW', value: `${data.flow_rate.value} ${data.flow_rate.unit}`, color: '#64b5f6' });
+            if (data.delta_t != null) stats.push({ label: 'ΔT', value: `${data.delta_t}°`, color: 'rgba(255,255,255,0.7)' });
+            if (data.power) stats.push({ label: 'POWER', value: `${data.power.value} ${data.power.unit}`, color: '#ffb74d' });
+            if (!stats.length) return '';
+            const spacing = 400 / (stats.length + 1);
+            return stats.map((s, i) => {
+              const x = spacing * (i + 1);
+              return svg`
+                <rect x="${x - 36}" y="${statsY}" width="72" height="20" rx="10" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="0.6"/>
+                <text x="${x}" y="${statsY + 10}" font-size="8" text-anchor="middle" fill="${s.color}" font-family="sans-serif" font-weight="700">${s.value}</text>
+                <text x="${x}" y="${statsY + 17}" font-size="5" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="sans-serif" font-weight="600">${s.label}</text>
+              `;
+            });
+          })()}
         </svg>
       </div>
     `;

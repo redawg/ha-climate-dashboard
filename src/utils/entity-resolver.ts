@@ -990,6 +990,7 @@ const FLOOR_SUPPLY_HINTS = ['supply', 'supply temp', 'supply water', 'supply tem
 const FLOOR_RETURN_HINTS = ['return', 'return temp', 'return water', 'return temperature', 'inlet', 'inlet temp', 'cold water', 'incoming'];
 const FLOOR_FLOW_HINTS = ['flow rate', 'flow', 'water flow'];
 const FLOOR_PUMP_HINTS = ['pump', 'boiler', 'circulator', 'manifold pump'];
+const FLOOR_POWER_HINTS = ['power', 'watt', 'consumption', 'current consumption', 'energy usage', 'power draw'];
 
 function matchesFloorSystemContext(name: string, entityId: string): boolean {
   const haystack = `${normalize(name)} ${normalize(entityId)}`;
@@ -1045,14 +1046,15 @@ function floorTempSideScore(
 
 function discoverFloorEntity(
   hass: HomeAssistant,
-  hint: 'supply' | 'return' | 'flow' | 'pump',
+  hint: 'supply' | 'return' | 'flow' | 'pump' | 'power',
   usedIds: Set<string>
 ): string | undefined {
-  const hintMap: Record<'supply' | 'return' | 'flow' | 'pump', string[]> = {
+  const hintMap: Record<typeof hint, string[]> = {
     supply: FLOOR_SUPPLY_HINTS,
     return: FLOOR_RETURN_HINTS,
     flow: FLOOR_FLOW_HINTS,
     pump: FLOOR_PUMP_HINTS,
+    power: FLOOR_POWER_HINTS,
   };
   const hints = hintMap[hint];
 
@@ -1094,6 +1096,12 @@ function discoverFloorEntity(
     ) {
       score += 4;
     }
+    if (hint === 'power') {
+      const uom = (entity.attributes.unit_of_measurement as string ?? '').toLowerCase();
+      if (uom === 'w' || uom === 'kw') score += 4;
+      if (normalize(name).includes('power') || normalize(name).includes('watt')) score += 3;
+      if (normalize(name).includes('consumption')) score += 2;
+    }
 
     if (score < 0) continue;
 
@@ -1118,6 +1126,7 @@ export function resolveFloorSystem(
     effectiveConfig.return_temp ||
     effectiveConfig.flow_rate ||
     effectiveConfig.pump_status ||
+    effectiveConfig.power ||
     (effectiveConfig.extra_sensors?.length ?? 0) > 0;
   const shouldAutoDiscover = effectiveConfig.auto_discover || !hasExplicit;
 
@@ -1126,7 +1135,7 @@ export function resolveFloorSystem(
 
   const resolveId = (
     explicit: string | undefined,
-    hint: 'supply' | 'return' | 'flow' | 'pump'
+    hint: 'supply' | 'return' | 'flow' | 'pump' | 'power'
   ): string | undefined => {
     if (explicit) return explicit;
     if (!shouldAutoDiscover) return undefined;
@@ -1163,6 +1172,12 @@ export function resolveFloorSystem(
       result.pump_entity = pumpId;
       result.pump_active = isPumpActive(pumpEntity);
     }
+  }
+
+  const powerId = resolveId(effectiveConfig.power, 'power');
+  if (powerId) {
+    usedIds.add(powerId);
+    result.power = metricFromEntity(hass, powerId);
   }
 
   // Discover water_heater entity for set temperature
@@ -1203,6 +1218,7 @@ export function resolveFloorSystem(
     result.return_temp ||
     result.flow_rate ||
     result.pump_entity ||
+    result.power ||
     (result.extra?.length ?? 0) > 0;
 
   return hasData ? result : null;

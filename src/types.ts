@@ -210,6 +210,8 @@ export interface FloorSystemConfig {
   flow_rate?: string;
   /** Boiler/pump status entity_id (binary_sensor or switch) */
   pump_status?: string;
+  /** Power draw sensor entity_id (W or kW) */
+  power?: string;
   /** Additional sensor entity_ids to display */
   extra_sensors?: string[];
   /** Auto-discover floor system sensors by pattern matching */
@@ -231,6 +233,7 @@ export interface FloorSystemData {
   flow_rate?: FloorSystemMetric;
   pump_active?: boolean;
   pump_entity?: string;
+  power?: FloorSystemMetric;
   heater_entity?: string;
   set_temp?: number;
   set_temp_unit?: string;
