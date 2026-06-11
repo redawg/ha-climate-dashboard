@@ -1504,6 +1504,23 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     return resolveWwsdState(this._hass, this._config);
   }
 
+  private isWwsdAffectedZone(zone: ClimateZone): boolean {
+    if (!this.wwsdState.active) return false;
+
+    const hasFloorLoop =
+      zone.sensors.floor != null ||
+      (zone.valves?.length ?? 0) > 0 ||
+      zone.kind === 'floor_heat';
+    if (!hasFloorLoop) return false;
+
+    const standaloneThermostat =
+      /thermostat/i.test(zone.name) &&
+      zone.sensors.floor == null &&
+      (zone.valves?.length ?? 0) === 0;
+
+    return !standaloneThermostat;
+  }
+
   private zoneDisplayTemp(
     current: number | undefined,
     sensors: ZoneSensors
@@ -1575,7 +1592,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       zone.kind === 'floor_heat'
         ? allModes.filter((m) => m === 'heat' || m === 'off')
         : allModes;
-    const wwsdActive = zone.kind === 'floor_heat' && this.wwsdState.active;
+    const wwsdActive = this.isWwsdAffectedZone(zone);
     const displayCurrent = this.zoneDisplayTemp(current, sensors);
 
     return html`
