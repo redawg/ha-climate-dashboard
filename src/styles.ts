@@ -60,8 +60,25 @@ export const styles: CSSResultGroup = css`
     opacity: 0.7;
   }
 
+  .top-strip {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+
+  .top-strip .weather-strip {
+    flex: 1;
+    margin-bottom: 0;
+  }
+
+  .top-strip .floor-system {
+    flex: 1;
+    margin-bottom: 0;
+  }
+
   .weather-strip {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     padding: 14px 18px;
@@ -103,6 +120,182 @@ export const styles: CSSResultGroup = css`
     font-size: 0.82rem;
     color: var(--secondary-text-color);
     text-align: right;
+  }
+
+  .weather-forecast {
+    display: flex;
+    gap: 2px;
+    width: 100%;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    justify-content: space-around;
+  }
+
+  .forecast-day {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    min-width: 48px;
+  }
+
+  .forecast-day-name {
+    font-size: 0.65rem;
+    color: var(--secondary-text-color);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+  }
+
+  .forecast-condition {
+    font-size: 1.2rem;
+    line-height: 1;
+  }
+
+  .forecast-temps {
+    display: flex;
+    gap: 4px;
+    font-size: 0.72rem;
+  }
+
+  .forecast-hi {
+    font-weight: 600;
+    color: var(--primary-text-color);
+  }
+
+  .forecast-lo {
+    color: var(--secondary-text-color);
+    opacity: 0.7;
+  }
+
+  .floor-system {
+    padding: 14px 18px;
+    margin-bottom: 18px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255, 152, 0, 0.12), rgba(255, 112, 67, 0.08));
+    border: 1px solid rgba(255, 152, 0, 0.2);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .floor-system-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .floor-system-icon {
+    font-size: 1.4rem;
+    line-height: 1;
+  }
+
+  .floor-system-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #ffb74d;
+  }
+
+  .floor-system-metrics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .floor-system-metric {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 64px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .floor-system-metric-label {
+    font-size: 0.58rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--secondary-text-color);
+    margin-bottom: 4px;
+  }
+
+  .floor-system-metric-value {
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: var(--primary-text-color);
+  }
+
+  .floor-system-metric.supply {
+    background: rgba(255, 152, 0, 0.12);
+    border-color: rgba(255, 152, 0, 0.25);
+  }
+
+  .floor-system-metric.supply .floor-system-metric-value {
+    color: #ffb74d;
+  }
+
+  .floor-system-metric.return {
+    background: rgba(66, 165, 245, 0.12);
+    border-color: rgba(66, 165, 245, 0.25);
+  }
+
+  .floor-system-metric.return .floor-system-metric-value {
+    color: #64b5f6;
+  }
+
+  .floor-system-metric.delta .floor-system-metric-value {
+    color: #26a69a;
+  }
+
+  .floor-system-metric.flow .floor-system-metric-value {
+    color: var(--primary-text-color);
+  }
+
+  .floor-system-metric.pump.active {
+    background: rgba(255, 112, 67, 0.15);
+    border-color: rgba(255, 112, 67, 0.3);
+  }
+
+  .floor-system-metric.pump.active .floor-system-metric-value {
+    color: #ff7043;
+  }
+
+  .floor-system-metric.pump.inactive .floor-system-metric-value {
+    color: var(--secondary-text-color);
+    opacity: 0.75;
+  }
+
+  .floor-system-extra {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 10px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .floor-system-extra-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 0.72rem;
+  }
+
+  .floor-system-extra-name {
+    color: var(--secondary-text-color);
+  }
+
+  .floor-system-extra-value {
+    color: var(--primary-text-color);
+    font-weight: 600;
   }
 
   .floor-section {
@@ -1031,6 +1224,10 @@ export const styles: CSSResultGroup = css`
       flex-direction: row;
       gap: 12px;
       text-align: left;
+    }
+
+    .floor-system-metrics {
+      justify-content: flex-start;
     }
 
     .zones-grid,

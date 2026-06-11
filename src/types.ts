@@ -58,6 +58,8 @@ export interface ClimateCommandCenterConfig {
   zone_kinds?: Record<string, 'floor_heat' | 'thermostat'>;
   /** Floor plan visualization config */
   floor_plan?: FloorPlanConfig;
+  /** Floor heating system config (supply/return temps, flow, etc.) */
+  floor_system?: FloorSystemConfig;
 }
 
 export interface ZoneSensors {
@@ -100,12 +102,21 @@ export interface FloorSection {
   unassignedSensors: AreaSensor[];
 }
 
+export interface ForecastEntry {
+  datetime: string;
+  temperature?: number;
+  templow?: number;
+  condition?: string;
+  precipitation_probability?: number;
+}
+
 export interface WeatherData {
   label: string;
   temperature?: number;
   humidity?: number;
   feels_like?: number;
   dew_point?: number;
+  forecast?: ForecastEntry[];
 }
 
 export interface HassEntity {
@@ -160,4 +171,35 @@ export interface FloorPlanConfig {
   image_url?: string;
   areas?: FloorPlanArea[];
   thermostats?: FloorPlanThermostat[];
+}
+
+export interface FloorSystemConfig {
+  /** Supply water temperature sensor entity_id */
+  supply_temp?: string;
+  /** Return water temperature sensor entity_id */
+  return_temp?: string;
+  /** Flow rate sensor entity_id */
+  flow_rate?: string;
+  /** Boiler/pump status entity_id (binary_sensor or switch) */
+  pump_status?: string;
+  /** Additional sensor entity_ids to display */
+  extra_sensors?: string[];
+  /** Auto-discover floor system sensors by pattern matching */
+  auto_discover?: boolean;
+}
+
+export interface FloorSystemMetric {
+  entity_id: string;
+  value: number;
+  unit: string;
+}
+
+export interface FloorSystemData {
+  supply_temp?: FloorSystemMetric;
+  return_temp?: FloorSystemMetric;
+  delta_t?: number;
+  flow_rate?: FloorSystemMetric;
+  pump_active?: boolean;
+  pump_entity?: string;
+  extra?: Array<{ entity_id: string; name: string; value: number; unit: string }>;
 }

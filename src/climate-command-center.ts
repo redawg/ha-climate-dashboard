@@ -8,10 +8,20 @@ import {
   ClimateZone,
   FloorPlanThermostat,
   FloorSection,
+  FloorSystemData,
   WeatherData,
   ZoneSensors,
 } from './types';
-import { buildFloorSections, buildZones, DEFAULT_FLOORS, floorNames, getWeatherData, autoAssignSensorToZone, listHaAreas } from './utils/entity-resolver';
+import {
+  buildFloorSections,
+  buildZones,
+  DEFAULT_FLOORS,
+  floorNames,
+  getWeatherData,
+  autoAssignSensorToZone,
+  listHaAreas,
+  resolveFloorSystem,
+} from './utils/entity-resolver';
 import { computeZoneHeightStats } from './utils/height-averages';
 import { FLOORPLAN_IMAGE } from './floorplan-image';
 
@@ -33,7 +43,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   @state() private _expandedZone: string | null = null;
   @state() private _editSensors = false;
   @state() private _setupMode = false;
-  @state() private _view: 'cards' | 'floorplan' = 'floorplan';
+  @state() private _view: 'cards' | 'floorplan' = 'cards';
   @state() private _placingThermostat: 'wall' | 'floor' | null = null;
 
   static get styles(): CSSResultGroup {
@@ -68,6 +78,10 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   private get weather(): WeatherData | null {
     if (!this._config.show_weather) return null;
     return getWeatherData(this.hass, this._config);
+  }
+
+  private get floorSystem(): FloorSystemData | null {
+    return resolveFloorSystem(this.hass, this._config);
   }
 
   private get totalZones(): number {
@@ -289,6 +303,105 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     return Math.round((current - target) * 10) / 10;
   }
 
+  private renderFloorSystem(): TemplateResult | null {
+    const data = this.floorSystem;
+    if (!data) return null;
+
+    return html`
+      <div class="floor-system">
+        <div class="floor-system-header">
+          <span class="floor-system-icon">\uD83D\uDEB0</span>
+          <span class="floor-system-title">Floor Water Supply</span>
+        </div>
+        <div class="floor-system-metrics">
+          ${data.supply_temp
+            ? html`
+                <div class="floor-system-metric supply">
+                  <span class="floor-system-metric-label">Supply</span>
+                  <span class="floor-system-metric-value">
+                    ${data.supply_temp.value}${data.supply_temp.unit}
+                  </span>
+                </div>
+              `
+            : ''}
+          ${data.return_temp
+            ? html`
+                <div class="floor-system-metric return">
+                  <span class="floor-system-metric-label">Return</span>
+                  <span class="floor-system-metric-value">
+                    ${data.return_temp.value}${data.return_temp.unit}
+                  </span>
+                </div>
+              `
+            : ''}
+          ${data.delta_t != null
+            ? html`
+                <div class="floor-system-metric delta">
+                  <span class="floor-system-metric-label">\u0394T</span>
+                  <span class="floor-system-metric-value">${data.delta_t}\u00B0</span>
+                </div>
+              `
+            : ''}
+          ${data.flow_rate
+            ? html`
+                <div class="floor-system-metric flow">
+                  <span class="floor-system-metric-label">Flow</span>
+                  <span class="floor-system-metric-value">
+                    ${data.flow_rate.value}${data.flow_rate.unit}
+                  </span>
+                </div>
+              `
+            : ''}
+          ${data.pump_entity != null
+            ? html`
+                <div class="floor-system-metric pump ${data.pump_active ? 'active' : 'inactive'}">
+                  <span class="floor-system-metric-label">Pump</span>
+                  <span class="floor-system-metric-value">
+                    ${data.pump_active ? 'On' : 'Off'}
+                  </span>
+                </div>
+              `
+            : ''}
+        </div>
+        ${data.extra?.length
+          ? html`
+              <div class="floor-system-extra">
+                ${data.extra.map(
+                  (s) => html`
+                    <span class="floor-system-extra-chip">
+                      <span class="floor-system-extra-name">${s.name}</span>
+                      <span class="floor-system-extra-value">${s.value}${s.unit}</span>
+                    </span>
+                  `
+                )}
+              </div>
+            `
+          : ''}
+      </div>
+    `;
+  }
+
+  private conditionIcon(condition?: string): string {
+    const map: Record<string, string> = {
+      'clear-night': '🌙',
+      sunny: '☀️',
+      partlycloudy: '⛅',
+      cloudy: '☁️',
+      rainy: '🌧️',
+      snowy: '❄️',
+      'snowy-rainy': '🌨️',
+      hail: '🌨️',
+      lightning: '⚡',
+      'lightning-rainy': '⛈️',
+      fog: '🌫️',
+      windy: '💨',
+      'windy-variant': '💨',
+      exceptional: '⚠️',
+      pouring: '🌧️',
+    };
+    return map[condition ?? ''] ?? '🌤️';
+  }
+
   private renderWeatherStrip(): TemplateResult | null {
     const weather = this.weather;
     if (!weather) return null;
@@ -307,6 +420,25 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           ${weather.feels_like != null ? html`<span>Feels ${Math.round(weather.feels_like)}\u00B0</span>` : ''}
           ${weather.dew_point != null ? html`<span>Dew ${Math.round(weather.dew_point)}\u00B0</span>` : ''}
         </div>
+        ${weather.forecast?.length
+          ? html`
+              <div class="weather-forecast">
+                ${weather.forecast.map((f) => {
+                  const day = new Date(f.datetime).toLocaleDateString('en-US', { weekday: 'short' });
+                  return html`
+                    <div class="forecast-day">
+                      <span class="forecast-day-name">${day}</span>
+                      <span class="forecast-condition">${this.conditionIcon(f.condition)}</span>
+                      <span class="forecast-temps">
+                        <span class="forecast-hi">${f.temperature ?? '\u2014'}\u00B0</span>
+                        <span class="forecast-lo">${f.templow ?? ''}${f.templow != null ? '\u00B0' : ''}</span>
+                      </span>
+                    </div>
+                  `;
+                })}
+              </div>
+            `
+          : ''}
       </div>
     `;
   }
@@ -861,7 +993,10 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
         </div>
         ${isFloorPlan
           ? html`
-              ${this.renderWeatherStrip()}
+              <div class="top-strip">
+                ${this.renderWeatherStrip()}
+                ${this.renderFloorSystem()}
+              </div>
               ${this.renderFloorPlan()}
             `
           : html`
@@ -870,7 +1005,10 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                 : this._editSensors
                   ? html`<div class="edit-hint">Assign sensors to HA areas or zones, set floor per zone, or hide. Save the dashboard to keep layout changes.</div>`
                   : ''}
-              ${this.renderWeatherStrip()}
+              <div class="top-strip">
+                ${this.renderWeatherStrip()}
+                ${this.renderFloorSystem()}
+              </div>
               ${sections.length
                 ? sections.map((s) => this.renderFloorSection(s))
                 : html`<div class="empty">No climate zones found. Check your configuration.</div>`}

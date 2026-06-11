@@ -7,6 +7,9 @@ import {
   ClimateZone,
   FloorConfig,
   FloorSection,
+  FloorSystemData,
+  FloorSystemMetric,
+  ForecastEntry,
   HaAreaOption,
   HassEntity,
   WeatherData,
@@ -721,6 +724,191 @@ export function listAssignableSensors(
   });
 }
 
+const FLOOR_SYSTEM_PATTERNS = [
+  'supply',
+  'return',
+  'flow',
+  'manifold',
+  'boiler',
+  'water_temp',
+  'pump',
+  'optimal',
+];
+
+const FLOOR_SUPPLY_HINTS = ['supply', 'supply temp', 'supply water', 'supply temperature'];
+const FLOOR_RETURN_HINTS = ['return', 'return temp', 'return water', 'return temperature'];
+const FLOOR_FLOW_HINTS = ['flow rate', 'flow', 'water flow'];
+const FLOOR_PUMP_HINTS = ['pump', 'boiler', 'circulator', 'manifold pump'];
+
+function matchesFloorSystemContext(name: string, entityId: string): boolean {
+  const haystack = `${normalize(name)} ${normalize(entityId)}`;
+  return FLOOR_SYSTEM_PATTERNS.some((p) => haystack.includes(normalize(p)));
+}
+
+function matchesHints(name: string, entityId: string, hints: string[]): boolean {
+  const haystack = `${normalize(name)} ${normalize(entityId)}`;
+  return hints.some((h) => haystack.includes(normalize(h)));
+}
+
+function metricFromEntity(hass: HomeAssistant, entityId: string | undefined): FloorSystemMetric | undefined {
+  const entity = getEntity(hass, entityId);
+  if (!entity) return undefined;
+  const value = parseNumber(entity);
+  if (value == null) return undefined;
+  const unit =
+    (entity.attributes.unit_of_measurement as string | undefined) ??
+    (entity.attributes.device_class === 'humidity' ? '%' : '°');
+  return { entity_id: entityId!, value, unit };
+}
+
+function isPumpActive(entity: HassEntity): boolean {
+  const state = entity.state;
+  if (state === 'unavailable' || state === 'unknown') return false;
+  if (entity.entity_id.startsWith('binary_sensor.') || entity.entity_id.startsWith('switch.')) {
+    return state === 'on';
+  }
+  return state === 'on' || state === 'running' || state === 'heat' || state === 'heating';
+}
+
+function discoverFloorEntity(
+  hass: HomeAssistant,
+  hint: 'supply' | 'return' | 'flow' | 'pump',
+  usedIds: Set<string>
+): string | undefined {
+  const hintMap: Record<'supply' | 'return' | 'flow' | 'pump', string[]> = {
+    supply: FLOOR_SUPPLY_HINTS,
+    return: FLOOR_RETURN_HINTS,
+    flow: FLOOR_FLOW_HINTS,
+    pump: FLOOR_PUMP_HINTS,
+  };
+  const hints = hintMap[hint];
+
+  let best: { id: string; score: number } | undefined;
+
+  for (const entity of Object.values(hass.states)) {
+    if (usedIds.has(entity.entity_id)) continue;
+    const name = friendlyName(entity as HassEntity);
+    if (!matchesFloorSystemContext(name, entity.entity_id)) continue;
+
+    if (hint === 'pump') {
+      if (
+        !entity.entity_id.startsWith('binary_sensor.') &&
+        !entity.entity_id.startsWith('switch.')
+      ) {
+        continue;
+      }
+    } else if (!entity.entity_id.startsWith('sensor.')) {
+      continue;
+    }
+
+    if (!matchesHints(name, entity.entity_id, hints)) continue;
+
+    let score = 0;
+    if (normalize(name).includes('optimal') || normalize(entity.entity_id).includes('optimal')) {
+      score += 2;
+    }
+    if (hint === 'supply' && normalize(name).includes('supply')) score += 4;
+    if (hint === 'return' && normalize(name).includes('return')) score += 4;
+    if (hint === 'flow' && normalize(name).includes('flow')) score += 4;
+    if (hint === 'pump' && (normalize(name).includes('pump') || normalize(name).includes('boiler'))) {
+      score += 4;
+    }
+
+    if (!best || score > best.score) {
+      best = { id: entity.entity_id, score };
+    }
+  }
+
+  return best?.id;
+}
+
+export function resolveFloorSystem(
+  hass: HomeAssistant,
+  config: ClimateCommandCenterConfig
+): FloorSystemData | null {
+  const floorConfig = config.floor_system;
+  if (!floorConfig) return null;
+
+  const hasExplicit =
+    floorConfig.supply_temp ||
+    floorConfig.return_temp ||
+    floorConfig.flow_rate ||
+    floorConfig.pump_status ||
+    (floorConfig.extra_sensors?.length ?? 0) > 0;
+  const shouldAutoDiscover = floorConfig.auto_discover || !hasExplicit;
+
+  const usedIds = new Set<string>();
+  const result: FloorSystemData = {};
+
+  const resolveId = (
+    explicit: string | undefined,
+    hint: 'supply' | 'return' | 'flow' | 'pump'
+  ): string | undefined => {
+    if (explicit) return explicit;
+    if (!shouldAutoDiscover) return undefined;
+    return discoverFloorEntity(hass, hint, usedIds);
+  };
+
+  const supplyId = resolveId(floorConfig.supply_temp, 'supply');
+  if (supplyId) {
+    usedIds.add(supplyId);
+    result.supply_temp = metricFromEntity(hass, supplyId);
+  }
+
+  const returnId = resolveId(floorConfig.return_temp, 'return');
+  if (returnId) {
+    usedIds.add(returnId);
+    result.return_temp = metricFromEntity(hass, returnId);
+  }
+
+  if (result.supply_temp?.value != null && result.return_temp?.value != null) {
+    result.delta_t = Math.round((result.supply_temp.value - result.return_temp.value) * 10) / 10;
+  }
+
+  const flowId = resolveId(floorConfig.flow_rate, 'flow');
+  if (flowId) {
+    usedIds.add(flowId);
+    result.flow_rate = metricFromEntity(hass, flowId);
+  }
+
+  const pumpId = resolveId(floorConfig.pump_status, 'pump');
+  if (pumpId) {
+    usedIds.add(pumpId);
+    const pumpEntity = getEntity(hass, pumpId);
+    if (pumpEntity) {
+      result.pump_entity = pumpId;
+      result.pump_active = isPumpActive(pumpEntity);
+    }
+  }
+
+  const extraIds = floorConfig.extra_sensors ?? [];
+  const extra: FloorSystemData['extra'] = [];
+  for (const entityId of extraIds) {
+    if (usedIds.has(entityId)) continue;
+    const entity = getEntity(hass, entityId);
+    if (!entity) continue;
+    const value = parseNumber(entity);
+    if (value == null) continue;
+    const name = friendlyLabel(friendlyName(entity), entityId);
+    const unit =
+      (entity.attributes.unit_of_measurement as string | undefined) ??
+      (entity.attributes.device_class === 'humidity' ? '%' : '');
+    extra.push({ entity_id: entityId, name, value, unit });
+    usedIds.add(entityId);
+  }
+
+  if (extra.length) result.extra = extra;
+
+  const hasData =
+    result.supply_temp ||
+    result.return_temp ||
+    result.flow_rate ||
+    result.pump_entity ||
+    (result.extra?.length ?? 0) > 0;
+
+  return hasData ? result : null;
+}
+
 export function getWeatherData(
   hass: HomeAssistant,
   config: ClimateCommandCenterConfig
@@ -758,7 +946,7 @@ export function getWeatherData(
 
   const label = friendlyName(tempEntity).replace(/\s+(Temperature|Temp)$/i, '') || 'Outside';
 
-  return {
+  const result: WeatherData = {
     label,
     temperature: parseNumber(tempEntity),
     humidity: parseNumber(getEntity(hass, config.weather_humidity ?? findWeatherSensor('humidity', 'humidity'))),
@@ -781,4 +969,17 @@ export function getWeatherData(
       )
     ),
   };
+
+  const weatherEntityId =
+    config.weather_entity ??
+    Object.keys(hass.states).find((eid) => eid.startsWith('weather.'));
+  if (weatherEntityId) {
+    const weatherState = getEntity(hass, weatherEntityId);
+    const rawForecast = weatherState?.attributes.forecast as ForecastEntry[] | undefined;
+    if (rawForecast?.length) {
+      result.forecast = rawForecast.slice(0, 5);
+    }
+  }
+
+  return result;
 }
