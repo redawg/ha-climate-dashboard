@@ -221,6 +221,9 @@ export interface FloorSystemData {
   flow_rate?: FloorSystemMetric;
   pump_active?: boolean;
   pump_entity?: string;
+  heater_entity?: string;
+  set_temp?: number;
+  set_temp_unit?: string;
   extra?: Array<{ entity_id: string; name: string; value: number; unit: string }>;
 }
 

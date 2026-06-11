@@ -826,13 +826,24 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                 <circle cx="265" cy="58" r="12" fill="#0d0d18" stroke="rgba(255,255,255,0.08)" stroke-width="0.5"/>
                 <text
                   x="265"
-                  y="61"
+                  y="${data.set_temp != null ? '56' : '61'}"
                   font-size="9"
                   text-anchor="middle"
                   fill="#ffb74d"
                   font-family="sans-serif"
                   font-weight="700"
-                >${outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
+                >${data.set_temp != null ? `${data.set_temp}°` : outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
+                ${data.set_temp != null ? html`
+                  <text
+                    x="265"
+                    y="65"
+                    font-size="5"
+                    text-anchor="middle"
+                    fill="rgba(255,255,255,0.4)"
+                    font-family="sans-serif"
+                    font-weight="600"
+                  >SET</text>
+                ` : ''}
                 <text
                   x="200"
                   y="88"

@@ -1144,6 +1144,21 @@ export function resolveFloorSystem(
     }
   }
 
+  // Discover water_heater entity for set temperature
+  const waterHeater = Object.values(hass.states).find(
+    (e) => e.entity_id.startsWith('water_heater.')
+  );
+  if (waterHeater) {
+    result.heater_entity = waterHeater.entity_id;
+    const setTemp = waterHeater.attributes.temperature as number | undefined;
+    if (setTemp != null) {
+      result.set_temp = setTemp;
+      result.set_temp_unit =
+        (waterHeater.attributes.unit_of_measurement as string | undefined) ??
+        (waterHeater.attributes.temperature_unit as string | undefined) ?? '°';
+    }
+  }
+
   const extraIds = effectiveConfig.extra_sensors ?? [];
   const extra: FloorSystemData['extra'] = [];
   for (const entityId of extraIds) {
