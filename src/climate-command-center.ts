@@ -783,11 +783,8 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     const customImage = fs !== false && fs?.heater_image?.trim() ? fs.heater_image.trim() : undefined;
     const heaterImage = customImage ?? DEFAULT_HEATER_IMAGE;
 
-    const allZones = this.sections.flatMap((s) => s.zones);
-    const anyValveActive = allZones.some((z) =>
-      z.valves?.length ? z.valves.some((v) => v.active) : z.valve_active === true
-    );
-    const systemFlowing = anyValveActive || data.pump_active === true;
+    const flowVal = data.flow_rate?.value != null ? Number(data.flow_rate.value) : NaN;
+    const systemFlowing = !isNaN(flowVal) && flowVal >= 0.02;
 
     const heaterW = 136;
     const heaterH = 136;
