@@ -1,0 +1,18 @@
+# Drop-in recorder tuning for HA Forest configuration.yaml
+# Reduces DB I/O during startup and ongoing operation.
+#
+# Merge into configuration.yaml or add as packages/recorder_tuning.yaml
+
+recorder:
+  purge_keep_days: 14
+  exclude:
+    domains:
+      - media_player
+      - device_tracker
+      - camera
+    entity_globs:
+      - sensor.*_led
+      - light.*_led
+      - binary_sensor.plex_*
+      - sensor.*unifi*
+      - sensor.*ubiquiti*

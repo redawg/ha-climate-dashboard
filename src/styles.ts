@@ -391,6 +391,104 @@ export const styles: CSSResultGroup = css`
     border-left-color: #ff7043;
   }
 
+  .zone-card.wwsd-active {
+    border-left-color: #ff9800;
+    background: linear-gradient(180deg, rgba(255, 152, 0, 0.06), transparent 55%);
+    cursor: pointer;
+  }
+
+  .zone-card.wwsd-active:hover {
+    box-shadow: 0 4px 20px rgba(255, 152, 0, 0.12);
+  }
+
+  .zone-mode.wwsd-mode {
+    color: #ff9800;
+    font-weight: 700;
+  }
+
+  .zone-action.wwsd-action {
+    background: rgba(255, 152, 0, 0.16);
+    color: #ffb74d;
+  }
+
+  .wwsd-dial {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 4px auto 8px;
+    width: min(100%, 168px);
+    aspect-ratio: 1;
+  }
+
+  .wwsd-dial-ring {
+    width: 100%;
+    height: 100%;
+  }
+
+  .wwsd-dial-arc {
+    filter: drop-shadow(0 0 6px rgba(255, 152, 0, 0.45));
+  }
+
+  .wwsd-dial-content {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 18px 12px;
+    gap: 2px;
+    pointer-events: none;
+  }
+
+  .wwsd-dial-current,
+  .wwsd-dial-target {
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.72);
+    line-height: 1.2;
+  }
+
+  .wwsd-dial-title {
+    font-size: 0.92rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #ff9800;
+    line-height: 1.15;
+    margin-top: 2px;
+  }
+
+  .wwsd-dial-subtitle {
+    font-size: 0.68rem;
+    font-weight: 500;
+    color: #ffb74d;
+    line-height: 1.2;
+  }
+
+  .wwsd-dial-target {
+    margin-top: 2px;
+  }
+
+  .wwsd-controls-disabled {
+    opacity: 0.55;
+    pointer-events: none;
+  }
+
+  .wwsd-controls-note {
+    margin-top: 8px;
+    font-size: 0.68rem;
+    text-align: center;
+    color: #ffb74d;
+    pointer-events: none;
+  }
+
+  .zone-controls.wwsd-controls-disabled .wwsd-controls-note {
+    pointer-events: auto;
+    opacity: 1;
+  }
+
   .zone-card.thermostat {
     border-left-color: #42a5f5;
   }

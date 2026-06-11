@@ -16,6 +16,7 @@ import {
   SunData,
   WeatherData,
   ZoneSensors,
+  WwsdState,
 } from './types';
 import {
   buildFloorSections,
@@ -29,8 +30,13 @@ import {
   buildFloorSystemData,
   discoverFloorSystemEntityIds,
   listFloorSystemEntityIds,
+  getTrackedEntityIds,
+  trackedStatesChanged,
+  invalidateEntityIndex,
 } from './utils/entity-resolver';
+import { getEntityIndex } from './utils/entity-index';
 import { computeZoneHeightStats } from './utils/height-averages';
+import { resolveWwsdState } from './utils/wwsd';
 import { FLOORPLAN_IMAGE } from './floorplan-image';
 import { DEFAULT_HEATER_IMAGE } from './heater-image';
 
@@ -60,11 +66,28 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
 
   private _forecastUnsub?: () => void;
   private _savePending = false;
+  private _saveDebounceTimer?: ReturnType<typeof setTimeout>;
+  private _sectionsCache: FloorSection[] | null = null;
+  private _trackedEntityIds: string[] = [];
+  private _lastStateCount = 0;
+  private _pendingSaveConfig: ClimateCommandCenterConfig | null = null;
 
   private _persistConfig(config: ClimateCommandCenterConfig): void {
     this._config = config;
+    this._invalidateSections();
+    invalidateEntityIndex();
     fireEvent(this, 'config-changed', { config });
-    this._saveToLovelace(config);
+    this._scheduleSaveToLovelace(config);
+  }
+
+  private _scheduleSaveToLovelace(cardConfig: ClimateCommandCenterConfig): void {
+    this._pendingSaveConfig = cardConfig;
+    if (this._saveDebounceTimer) clearTimeout(this._saveDebounceTimer);
+    this._saveDebounceTimer = setTimeout(() => {
+      const pending = this._pendingSaveConfig;
+      this._pendingSaveConfig = null;
+      if (pending) void this._saveToLovelace(pending);
+    }, 300);
   }
 
   private async _saveToLovelace(cardConfig: ClimateCommandCenterConfig): Promise<void> {
@@ -154,28 +177,42 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     if (!this._forecastUnsub && hass) {
       this._subscribeForecast();
     }
-    if (!prev || prev !== hass || this._floorSystemStatesChanged(prev, hass) || this._sunStateChanged(prev, hass)) {
+    const stateCount = Object.keys(hass.states).length;
+    if (stateCount !== this._lastStateCount) {
+      this._lastStateCount = stateCount;
+      invalidateEntityIndex();
+      this._rebuildTrackedEntities();
+      this._invalidateSections();
+      this.requestUpdate();
+      return;
+    }
+    if (!prev || !this._config) {
+      this._rebuildTrackedEntities();
+      this.requestUpdate();
+      return;
+    }
+    if (trackedStatesChanged(prev, hass, this._trackedEntityIds)) {
+      this._invalidateSections();
       this.requestUpdate();
     }
   }
 
-  private _sunStateChanged(prev: HomeAssistant, next: HomeAssistant): boolean {
-    const a = prev.states['sun.sun'];
-    const b = next.states['sun.sun'];
-    if (!a || !b) return a !== b;
-    return a.last_updated !== b.last_updated;
+  private _rebuildTrackedEntities(): void {
+    if (!this._hass || !this._config) {
+      this._trackedEntityIds = [];
+      return;
+    }
+    const index = getEntityIndex(this._hass, this._config);
+    this._trackedEntityIds = getTrackedEntityIds(
+      this._hass,
+      this._config,
+      index,
+      this._floorSystemEntityIds ? listFloorSystemEntityIds(this._floorSystemEntityIds) : undefined
+    );
   }
 
-  private _floorSystemStatesChanged(prev: HomeAssistant, next: HomeAssistant): boolean {
-    const ids = this._floorSystemEntityIds;
-    if (!ids) return false;
-    for (const entityId of listFloorSystemEntityIds(ids)) {
-      const oldState = prev.states[entityId];
-      const newState = next.states[entityId];
-      if (oldState?.state !== newState?.state) return true;
-      if (oldState?.last_updated !== newState?.last_updated) return true;
-    }
-    return false;
+  private _invalidateSections(): void {
+    this._sectionsCache = null;
   }
 
   public setConfig(config: ClimateCommandCenterConfig): void {
@@ -194,8 +231,11 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       floors: config.floors?.length ? config.floors : DEFAULT_FLOORS,
     };
     this._floorSystemEntityIds = undefined;
+    this._invalidateSections();
+    invalidateEntityIndex();
     if (this._hass) {
       this._floorSystemEntityIds = discoverFloorSystemEntityIds(this._hass, this._config);
+      this._rebuildTrackedEntities();
     }
   }
 
@@ -211,6 +251,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   public disconnectedCallback(): void {
     super.disconnectedCallback();
     this._unsubscribeForecast();
+    if (this._saveDebounceTimer) clearTimeout(this._saveDebounceTimer);
   }
 
   private async _subscribeForecast(): Promise<void> {
@@ -252,7 +293,10 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   }
 
   private get sections(): FloorSection[] {
-    return buildFloorSections(this.hass, this._config);
+    if (this._sectionsCache) return this._sectionsCache;
+    const built = buildFloorSections(this.hass, this._config);
+    this._sectionsCache = built;
+    return built;
   }
 
   private get weather(): WeatherData | null {
@@ -1455,6 +1499,65 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     `;
   }
 
+  private get wwsdState(): WwsdState {
+    if (!this._hass || !this._config) return { active: false };
+    return resolveWwsdState(this._hass, this._config);
+  }
+
+  private zoneDisplayTemp(
+    current: number | undefined,
+    sensors: ZoneSensors
+  ): number | undefined {
+    return sensors.room ?? current ?? sensors.floor;
+  }
+
+  private renderWwsdDial(
+    current: number | undefined,
+    target: number | undefined
+  ): TemplateResult {
+    const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+    const r = 52;
+    const circumference = 2 * Math.PI * r;
+    const arcLen = circumference * (130 / 360);
+
+    return html`
+      <div class="wwsd-dial" @click=${(e: Event) => e.stopPropagation()}>
+        <svg class="wwsd-dial-ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle
+            cx="60"
+            cy="60"
+            r="${r}"
+            fill="none"
+            stroke="rgba(255, 255, 255, 0.08)"
+            stroke-width="4"
+          />
+          <circle
+            cx="60"
+            cy="60"
+            r="${r}"
+            fill="none"
+            stroke="#ff9800"
+            stroke-width="4"
+            stroke-linecap="round"
+            stroke-dasharray="${arcLen} ${circumference - arcLen}"
+            transform="rotate(125 60 60)"
+            class="wwsd-dial-arc"
+          />
+        </svg>
+        <div class="wwsd-dial-content">
+          ${current != null
+            ? html`<div class="wwsd-dial-current">${fmt(current)}\u00B0</div>`
+            : ''}
+          <div class="wwsd-dial-title">WWSD ACTIVE</div>
+          <div class="wwsd-dial-subtitle">System Disabled</div>
+          ${target != null
+            ? html`<div class="wwsd-dial-target">${fmt(target)}\u00B0</div>`
+            : ''}
+        </div>
+      </div>
+    `;
+  }
+
   private renderZone(zone: ClimateZone): TemplateResult {
     const state = this.hass.states[zone.climate_entity];
     if (!state) return html``;
@@ -1472,9 +1575,11 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       zone.kind === 'floor_heat'
         ? allModes.filter((m) => m === 'heat' || m === 'off')
         : allModes;
+    const wwsdActive = zone.kind === 'floor_heat' && this.wwsdState.active;
+    const displayCurrent = this.zoneDisplayTemp(current, sensors);
 
     return html`
-      <div class="zone-card ${expanded ? 'expanded' : ''} ${zone.kind} ${this.modeClass(mode)} ${this.actionClass(hvacAction)}">
+      <div class="zone-card ${expanded ? 'expanded' : ''} ${zone.kind} ${this.modeClass(mode)} ${this.actionClass(hvacAction)} ${wwsdActive ? 'wwsd-active' : ''}">
         <div class="zone-header" @click=${() => this.toggleExpand(zone.climate_entity)}>
           <div class="zone-info">
             <div class="zone-name-row">
@@ -1482,88 +1587,103 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
               <span class="zone-kind-badge">${zone.kind === 'floor_heat' ? 'Floor' : 'HVAC'}</span>
             </div>
             <div class="zone-status-row">
-              <span class="zone-mode ${this.modeClass(mode)}">${mode.replace('_', ' ')}</span>
-              <span class="zone-action ${this.actionClass(hvacAction)}">
-                ${hvacAction === 'heating' ? '\uD83D\uDD25 ' : hvacAction === 'cooling' ? '\u2744\uFE0F ' : ''}${this.actionLabel(hvacAction)}
-              </span>
+              ${wwsdActive
+                ? html`
+                    <span class="zone-mode wwsd-mode">WWSD</span>
+                    <span class="zone-action wwsd-action">System Disabled</span>
+                  `
+                : html`
+                    <span class="zone-mode ${this.modeClass(mode)}">${mode.replace('_', ' ')}</span>
+                    <span class="zone-action ${this.actionClass(hvacAction)}">
+                      ${hvacAction === 'heating' ? '\uD83D\uDD25 ' : hvacAction === 'cooling' ? '\u2744\uFE0F ' : ''}${this.actionLabel(hvacAction)}
+                    </span>
+                  `}
             </div>
             ${zone.area ? html`<div class="zone-area-label">${zone.area}</div>` : ''}
             ${this._setupMode ? this.renderZoneKindSetup(zone) : ''}
             ${this.renderZoneFloorEdit(zone)}
             ${this.renderZoneAreaEdit(zone)}
           </div>
-          <div class="zone-temps">
-            <div class="temp-target-row">
-              <span class="target-label">Set to</span>
-              <span class="target-temp">${target ?? '\u2014'}\u00B0</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="zone-temp-grid">
-          ${sensors.floor != null
-            ? html`
-                <div class="temp-cell">
-                  <span class="temp-cell-label">Floor</span>
-                  <span class="temp-cell-value">${sensors.floor}\u00B0</span>
-                </div>
-              `
-            : ''}
-          ${sensors.room != null
-            ? html`
-                <div class="temp-cell">
-                  <span class="temp-cell-label">Room</span>
-                  <span class="temp-cell-value">${sensors.room}\u00B0</span>
-                </div>
-              `
-            : ''}
-          ${current != null && sensors.floor == null && sensors.room == null
-            ? html`
-                <div class="temp-cell">
-                  <span class="temp-cell-label">Current</span>
-                  <span class="temp-cell-value">${current}\u00B0</span>
-                </div>
-              `
-            : ''}
-          ${current != null && (sensors.floor != null || sensors.room != null)
-            ? html`
-                <div class="temp-cell">
-                  <span class="temp-cell-label">Thermostat</span>
-                  <span class="temp-cell-value">${current}\u00B0</span>
-                </div>
-              `
-            : ''}
-          <div class="temp-cell temp-cell-target">
-            <span class="temp-cell-label">Target</span>
-            <span class="temp-cell-value">${target ?? '\u2014'}\u00B0</span>
-          </div>
-          ${humidity != null
-            ? html`
-                <div class="temp-cell">
-                  <span class="temp-cell-label">Humidity</span>
-                  <span class="temp-cell-value">${humidity}%</span>
-                </div>
-              `
-            : sensors.humidity != null
-              ? html`
-                  <div class="temp-cell">
-                    <span class="temp-cell-label">Humidity</span>
-                    <span class="temp-cell-value">${sensors.humidity}%</span>
+          ${wwsdActive
+            ? ''
+            : html`
+                <div class="zone-temps">
+                  <div class="temp-target-row">
+                    <span class="target-label">Set to</span>
+                    <span class="target-temp">${target ?? '\u2014'}\u00B0</span>
                   </div>
-                `
-              : ''}
+                </div>
+              `}
         </div>
 
-        ${this.renderHydronicLoop(zone, hvacAction)}
-        ${this.renderValveLine(zone)}
+        ${wwsdActive
+          ? this.renderWwsdDial(displayCurrent, target)
+          : html`
+              <div class="zone-temp-grid">
+                ${sensors.floor != null
+                  ? html`
+                      <div class="temp-cell">
+                        <span class="temp-cell-label">Floor</span>
+                        <span class="temp-cell-value">${sensors.floor}\u00B0</span>
+                      </div>
+                    `
+                  : ''}
+                ${sensors.room != null
+                  ? html`
+                      <div class="temp-cell">
+                        <span class="temp-cell-label">Room</span>
+                        <span class="temp-cell-value">${sensors.room}\u00B0</span>
+                      </div>
+                    `
+                  : ''}
+                ${current != null && sensors.floor == null && sensors.room == null
+                  ? html`
+                      <div class="temp-cell">
+                        <span class="temp-cell-label">Current</span>
+                        <span class="temp-cell-value">${current}\u00B0</span>
+                      </div>
+                    `
+                  : ''}
+                ${current != null && (sensors.floor != null || sensors.room != null)
+                  ? html`
+                      <div class="temp-cell">
+                        <span class="temp-cell-label">Thermostat</span>
+                        <span class="temp-cell-value">${current}\u00B0</span>
+                      </div>
+                    `
+                  : ''}
+                <div class="temp-cell temp-cell-target">
+                  <span class="temp-cell-label">Target</span>
+                  <span class="temp-cell-value">${target ?? '\u2014'}\u00B0</span>
+                </div>
+                ${humidity != null
+                  ? html`
+                      <div class="temp-cell">
+                        <span class="temp-cell-label">Humidity</span>
+                        <span class="temp-cell-value">${humidity}%</span>
+                      </div>
+                    `
+                  : sensors.humidity != null
+                    ? html`
+                        <div class="temp-cell">
+                          <span class="temp-cell-label">Humidity</span>
+                          <span class="temp-cell-value">${sensors.humidity}%</span>
+                        </div>
+                      `
+                    : ''}
+              </div>
+            `}
 
-        ${this.renderZoneHeightStats(zone, current)}
+        ${wwsdActive ? '' : this.renderHydronicLoop(zone, hvacAction)}
+        ${wwsdActive ? '' : this.renderValveLine(zone)}
 
-        ${this.renderZoneSensorsBlock(zone)}
+        ${wwsdActive ? '' : this.renderZoneHeightStats(zone, current)}
+
+        ${wwsdActive ? '' : this.renderZoneSensorsBlock(zone)}
 
         ${expanded
           ? html`
-              <div class="zone-controls">
+              <div class="zone-controls ${wwsdActive ? 'wwsd-controls-disabled' : ''}">
                 ${this._editSensors
                   ? html`
                       <label class="zone-height-edit" @click=${(e: Event) => e.stopPropagation()}>
@@ -1593,9 +1713,10 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                     (m) => html`
                       <button
                         class="mode-btn ${mode === m ? 'active' : ''} ${this.modeClass(m)}"
+                        ?disabled=${wwsdActive}
                         @click=${(e: Event) => {
                           e.stopPropagation();
-                          this.setHvacMode(zone.climate_entity, m);
+                          if (!wwsdActive) this.setHvacMode(zone.climate_entity, m);
                         }}
                       >
                         ${m.replace('_', '/')}
@@ -1606,9 +1727,10 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                 <div class="setpoint-controls">
                   <button
                     class="step-btn"
+                    ?disabled=${wwsdActive}
                     @click=${(e: Event) => {
                       e.stopPropagation();
-                      this.adjustSetpoint(zone.climate_entity, target, -1);
+                      if (!wwsdActive) this.adjustSetpoint(zone.climate_entity, target, -1);
                     }}
                   >
                     \u2212
@@ -1616,14 +1738,18 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                   <span class="setpoint-display">${target ?? '\u2014'}\u00B0</span>
                   <button
                     class="step-btn"
+                    ?disabled=${wwsdActive}
                     @click=${(e: Event) => {
                       e.stopPropagation();
-                      this.adjustSetpoint(zone.climate_entity, target, 1);
+                      if (!wwsdActive) this.adjustSetpoint(zone.climate_entity, target, 1);
                     }}
                   >
                     +
                   </button>
                 </div>
+                ${wwsdActive
+                  ? html`<div class="wwsd-controls-note">Heating disabled during warm weather shutdown</div>`
+                  : ''}
               </div>
             `
           : ''}

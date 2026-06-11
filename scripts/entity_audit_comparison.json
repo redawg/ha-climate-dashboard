@@ -1,0 +1,28 @@
+{
+  "before": {
+    "timestamp": "2026-06-11T21:05:56Z",
+    "total_entities": 2151,
+    "rest_get_states_ms": 8797,
+    "ws_get_states_ms": 26567,
+    "unavailable": 504,
+    "unknown": 107
+  },
+  "after_cleanup": {
+    "timestamp": "2026-06-11T21:12:00Z",
+    "total_entities": 2135,
+    "rest_get_states_ms": 8760,
+    "ws_get_states_ms": 14614,
+    "unavailable": 446,
+    "unknown": 90,
+    "entities_disabled": 162
+  },
+  "card_performance": {
+    "note": "Built locally (v0.5.1 bundle). Deploy via HACS git push or SSH when credentials available.",
+    "changes": [
+      "Entity index cache in entity-resolver.ts",
+      "Section cache + tracked-entity hass setter in climate-command-center.ts",
+      "Valve discovery cache",
+      "300ms debounce on lovelace/config/save"
+    ]
+  }
+}

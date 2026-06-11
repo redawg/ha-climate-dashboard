@@ -1,0 +1,152 @@
+{
+  "timestamp": "2026-06-11T21:12:29Z",
+  "ha_url": "http://172.16.255.250:8123",
+  "rest_get_states_ms": 8760.5,
+  "ws_get_states_ms": 14613.7,
+  "total": 2135,
+  "by_domain": {
+    "sensor": 730,
+    "switch": 279,
+    "device_tracker": 241,
+    "binary_sensor": 224,
+    "number": 185,
+    "button": 131,
+    "select": 80,
+    "light": 76,
+    "update": 61,
+    "automation": 32,
+    "media_player": 22,
+    "event": 19,
+    "calendar": 10,
+    "camera": 8,
+    "cover": 7,
+    "climate": 5,
+    "lock": 5,
+    "tts": 2,
+    "notify": 2,
+    "fan": 2
+  },
+  "by_integration": {
+    "sensor": 648,
+    "unifi": 268,
+    "binary_sensor": 224,
+    "switch": 219,
+    "device_tracker": 130,
+    "number": 116,
+    "deye_solar": 106,
+    "button": 67,
+    "select": 64,
+    "light": 61,
+    "update": 55,
+    "sensorlinx": 49,
+    "automation": 32,
+    "event": 19,
+    "media_player": 11
+  },
+  "unavailable": 446,
+  "unknown": 90,
+  "plex_unavailable": 11,
+  "duplicate_name_clusters": 62,
+  "top_duplicate_names": [
+    {
+      "name": "main panel power minute average",
+      "entities": [
+        "sensor.main_panel_power_minute_average",
+        "sensor.tesla_charger_a_power_minute_average",
+        "sensor.tesla_charger_b_power_minute_average",
+        "sensor.subpanel_feed_a_power_minute_average",
+        "sensor.oven_a_side_microwave_power_minute_average"
+      ]
+    },
+    {
+      "name": "main panel energy this month",
+      "entities": [
+        "sensor.main_panel_energy_this_month",
+        "sensor.tesla_charger_a_energy_this_month",
+        "sensor.tesla_charger_b_energy_this_month",
+        "sensor.subpanel_feed_a_energy_this_month",
+        "sensor.oven_a_side_microwave_energy_this_month"
+      ]
+    },
+    {
+      "name": "main panel energy today",
+      "entities": [
+        "sensor.main_panel_energy_today",
+        "sensor.tesla_charger_a_energy_today",
+        "sensor.tesla_charger_b_energy_today",
+        "sensor.subpanel_feed_a_energy_today",
+        "sensor.oven_a_side_microwave_energy_today"
+      ]
+    },
+    {
+      "name": "attic - ultra switch poe out + data power cycle",
+      "entities": [
+        "button.attic_ultra_switch_poe_out_data_power_cycle",
+        "button.attic_ultra_switch_poe_out_data_power_cycle_2",
+        "button.attic_ultra_switch_poe_out_data_power_cycle_3",
+        "button.attic_ultra_switch_poe_out_data_power_cycle_4",
+        "button.attic_ultra_switch_poe_out_data_power_cycle_5"
+      ]
+    },
+    {
+      "name": "iphone",
+      "entities": [
+        "device_tracker.iphone_5",
+        "device_tracker.iphone_7",
+        "device_tracker.iphone_8",
+        "device_tracker.iphone_12",
+        "device_tracker.unifi_default_c2_28_bf_2a_21_11"
+      ]
+    },
+    {
+      "name": "watch",
+      "entities": [
+        "device_tracker.unifi_default_aa_b3_da_08_bf_23",
+        "device_tracker.unifi_default_8e_72_9f_c0_83_1d",
+        "device_tracker.unifi_default_26_f8_39_0c_25_98",
+        "device_tracker.watch_8",
+        "device_tracker.unifi_default_d6_da_97_70_85_a0"
+      ]
+    },
+    {
+      "name": "cloud connection",
+      "entities": [
+        "binary_sensor.office_cabinet_cloud_connection",
+        "binary_sensor.laundry_leds_cloud_connection",
+        "binary_sensor.pantry_leds_cloud_connection",
+        "binary_sensor.garage_left_top_cloud_connection",
+        "binary_sensor.garage_right_top_cloud_connection"
+      ]
+    },
+    {
+      "name": "light preset",
+      "entities": [
+        "select.laundry_leds_light_preset",
+        "select.pantry_leds_light_preset",
+        "select.garage_left_top_light_preset",
+        "select.garage_right_top_light_preset",
+        "select.garage_side_top_light_preset"
+      ]
+    },
+    {
+      "name": "current consumption",
+      "entities": [
+        "sensor.laundry_leds_current_consumption",
+        "sensor.pantry_leds_current_consumption",
+        "sensor.garage_left_top_current_consumption",
+        "sensor.garage_right_top_current_consumption",
+        "sensor.garage_side_top_current_consumption"
+      ]
+    },
+    {
+      "name": "today's consumption",
+      "entities": [
+        "sensor.laundry_leds_today_s_consumption",
+        "sensor.pantry_leds_today_s_consumption",
+        "sensor.garage_left_top_today_s_consumption",
+        "sensor.garage_right_top_today_s_consumption",
+        "sensor.garage_side_top_today_s_consumption"
+      ]
+    }
+  ]
+}

@@ -1,4 +1,13 @@
 import { HomeAssistant } from 'custom-card-helpers';
+import {
+  getEntityIndex,
+  getTrackedEntityIds,
+  invalidateEntityIndex,
+  registerEntityIndexDeps,
+  resolveWeatherEntityId,
+  trackedStatesChanged,
+  valvesFromEntityIds,
+} from './entity-index';
 import { resolveSensorHeight } from './height-averages';
 import {
   AreaSensor,
@@ -344,15 +353,8 @@ function climateZoneSlug(climateEntityId: string): string {
   return slug;
 }
 
-function floorHeatSensorIds(hass: HomeAssistant): Set<string> {
-  const ids = new Set<string>();
-  for (const entity of Object.values(hass.states)) {
-    if (!entity.entity_id.startsWith('climate.')) continue;
-    const zoneSlug = climateZoneSlug(entity.entity_id);
-    ids.add(`sensor.${zoneSlug}_floor_temperature`);
-    ids.add(`sensor.${zoneSlug}_room_temperature`);
-  }
-  return ids;
+function floorHeatSensorIds(hass: HomeAssistant, config: ClimateCommandCenterConfig): Set<string> {
+  return getEntityIndex(hass, config).floorHeatLinkedIds;
 }
 
 /** Floor-heat companion sensors and thermostat built-in readings — not standalone room sensors. */
@@ -411,12 +413,22 @@ function findBestSensor(
   zoneName: string,
   hint: string,
   deviceClass: 'temperature' | 'humidity',
-  climateEntityId?: string
+  climateEntityId?: string,
+  candidateIds?: string[]
 ): string | undefined {
   const zoneAreaId = climateEntityId ? entityAreaId(hass, climateEntityId) : undefined;
   let best: { id: string; score: number } | undefined;
-  for (const entity of Object.values(hass.states)) {
-    if (!entity.entity_id.startsWith('sensor.')) continue;
+  const pool = candidateIds?.length
+    ? candidateIds
+        .map((id) => hass.states[id] as HassEntity | undefined)
+        .filter((e): e is HassEntity => !!e)
+    : Object.values(hass.states).filter(
+        (e) =>
+          e.entity_id.startsWith('sensor.') &&
+          e.attributes.device_class === deviceClass
+      );
+
+  for (const entity of pool) {
     if (entity.attributes.device_class !== deviceClass) continue;
     const name = friendlyName(entity as HassEntity);
     if (isExcluded(name, entity.entity_id)) continue;
@@ -440,41 +452,32 @@ function valveFromNumericState(entity_id: string, state: string): ZoneValve | un
   return { entity_id, position: pos, active: pos > 0 };
 }
 
-function resolveValves(
+function discoverValveEntityIds(
   hass: HomeAssistant,
   climateEntity: string,
   zoneConfig?: ZoneConfig
-): ZoneValve[] {
+): string[] {
   const slug = climateZoneSlug(climateEntity);
   const slugTokens = slug.split('_').filter((t) => t.length > 2);
   const slugNorm = normalize(slug.replace(/_/g, ' '));
   const states = hass.states;
 
-  // 1. Check explicit config override
-  if (zoneConfig?.valve_entity) {
-    const state = states[zoneConfig.valve_entity];
-    if (state) {
-      const numeric = valveFromNumericState(zoneConfig.valve_entity, state.state);
-      if (numeric) return [numeric];
-      return [valveFromBinaryState(zoneConfig.valve_entity, state.state)];
-    }
+  if (zoneConfig?.valve_entity && states[zoneConfig.valve_entity]) {
+    return [zoneConfig.valve_entity];
   }
 
-  // 2. Try slug + "valve" matching (existing logic for generic integrations)
-  const slugValves: ZoneValve[] = [];
+  const slugValveIds: string[] = [];
   for (const [eid, state] of Object.entries(states)) {
     if (!eid.includes(slug) || !eid.includes('valve')) continue;
     if (eid.startsWith('number.') || eid.startsWith('sensor.')) {
-      const numeric = valveFromNumericState(eid, state.state);
-      if (numeric) slugValves.push(numeric);
+      if (!isNaN(parseFloat(state.state))) slugValveIds.push(eid);
     } else if (eid.startsWith('switch.') || eid.startsWith('binary_sensor.')) {
-      slugValves.push(valveFromBinaryState(eid, state.state));
+      slugValveIds.push(eid);
     }
   }
-  if (slugValves.length) return slugValves;
+  if (slugValveIds.length) return slugValveIds;
 
-  // 3. SensorLinx / HBX per-zone floor control (zone calling for hydronic flow)
-  for (const [eid, state] of Object.entries(states)) {
+  for (const [eid] of Object.entries(states)) {
     if (!eid.startsWith('switch.') || !eid.includes('floor_control_mode')) continue;
     const suffix = eid.split('floor_control_mode_').pop() ?? '';
     const suffixNorm = normalize(suffix.replace(/_/g, ' '));
@@ -482,11 +485,9 @@ function resolveValves(
       suffixNorm === slugNorm ||
       normalize(suffix) === normalize(slug) ||
       suffixNorm === normalize(slug.replace(/_/g, ' '));
-    if (!slugMatch) continue;
-    return [valveFromBinaryState(eid, state.state)];
+    if (slugMatch) return [eid];
   }
 
-  // 4. Redawghome zone relays: each zone relay is its own valve
   const redawghomeZones = Object.entries(states).filter(
     ([eid]) => eid.startsWith('binary_sensor.') && eid.includes('redawghome_zone')
   );
@@ -535,15 +536,12 @@ function resolveValves(
             return slugTokens.some((token) => idNorm.includes(normalize(token)));
           });
 
-    if (assigned.length) {
-      return assigned.map(({ eid, state }) => valveFromBinaryState(eid, state.state));
-    }
+    if (assigned.length) return assigned.map(({ eid }) => eid);
   }
 
-  // 5. HBX-style: binary_sensor with device_class running/heat in same area
   const climateAreaId = entityAreaId(hass, climateEntity);
   if (climateAreaId) {
-    const areaValves: ZoneValve[] = [];
+    const areaValveIds: string[] = [];
     for (const [eid, state] of Object.entries(states)) {
       if (!eid.startsWith('binary_sensor.')) continue;
       const attrs = state.attributes as Record<string, unknown>;
@@ -561,38 +559,57 @@ function resolveValves(
       if (!looksLikeValve) continue;
 
       const sensorAreaId = entityAreaId(hass, eid);
-      if (sensorAreaId === climateAreaId) {
-        areaValves.push(valveFromBinaryState(eid, state.state));
-      }
+      if (sensorAreaId === climateAreaId) areaValveIds.push(eid);
     }
-    if (areaValves.length) return areaValves;
+    if (areaValveIds.length) return areaValveIds;
   }
 
-  // 6. Fallback: match by zone name in friendly_name
   const climateState = states[climateEntity];
   const climateName = normalize((climateState?.attributes?.friendly_name as string) ?? '');
   if (climateName) {
-    const nameValves: ZoneValve[] = [];
+    const nameValveIds: string[] = [];
     for (const [eid, state] of Object.entries(states)) {
       if (!eid.startsWith('binary_sensor.')) continue;
       const attrs = state.attributes as Record<string, unknown>;
       const dc = attrs.device_class as string | undefined;
       if (dc !== 'running' && dc !== 'heat') continue;
-      const friendlyName = normalize((attrs.friendly_name as string) ?? '');
+      const friendly = normalize((attrs.friendly_name as string) ?? '');
       const nameTokens = climateName
         .replace(/thm|climate|thermostat/g, '')
         .trim()
         .split(/\s+/)
         .filter((t) => t.length > 2);
-      const matches = nameTokens.some((token) => friendlyName.includes(token));
-      if (matches) {
-        nameValves.push(valveFromBinaryState(eid, state.state));
-      }
+      const matches = nameTokens.some((token) => friendly.includes(token));
+      if (matches) nameValveIds.push(eid);
     }
-    if (nameValves.length) return nameValves;
+    if (nameValveIds.length) return nameValveIds;
   }
 
   return [];
+}
+
+function resolveValves(
+  hass: HomeAssistant,
+  climateEntity: string,
+  zoneConfig?: ZoneConfig,
+  config?: ClimateCommandCenterConfig
+): ZoneValve[] {
+  if (zoneConfig?.valve_entity) {
+    const state = hass.states[zoneConfig.valve_entity];
+    if (state) {
+      const numeric = valveFromNumericState(zoneConfig.valve_entity, state.state);
+      if (numeric) return [numeric];
+      return [valveFromBinaryState(zoneConfig.valve_entity, state.state)];
+    }
+  }
+
+  if (config) {
+    const index = getEntityIndex(hass, config);
+    const cached = index.valveIdsByClimate.get(climateEntity);
+    if (cached?.length) return valvesFromEntityIds(hass, cached);
+  }
+
+  return valvesFromEntityIds(hass, discoverValveEntityIds(hass, climateEntity, zoneConfig));
 }
 
 function resolveValve(
@@ -612,23 +629,44 @@ function resolveValve(
 
 function resolveLinkedSensorIds(
   hass: HomeAssistant,
-  zone: ZoneConfig
+  zone: ZoneConfig,
+  index?: ReturnType<typeof getEntityIndex>
 ): ClimateZone['linked_sensor_ids'] {
+  const tempIds = index?.temperatureSensorIds;
+  const humIds = index?.humiditySensorIds;
   return {
     floor:
       zone.floor_sensor ??
-      findBestSensor(hass, zone.name, 'floor temperature', 'temperature', zone.climate_entity),
+      findBestSensor(
+        hass,
+        zone.name,
+        'floor temperature',
+        'temperature',
+        zone.climate_entity,
+        tempIds
+      ),
     room:
       zone.room_sensor ??
-      findBestSensor(hass, zone.name, 'room temperature', 'temperature', zone.climate_entity),
+      findBestSensor(
+        hass,
+        zone.name,
+        'room temperature',
+        'temperature',
+        zone.climate_entity,
+        tempIds
+      ),
     humidity:
       zone.humidity_sensor ??
-      findBestSensor(hass, zone.name, 'humidity', 'humidity', zone.climate_entity),
+      findBestSensor(hass, zone.name, 'humidity', 'humidity', zone.climate_entity, humIds),
   };
 }
 
-function resolveSensors(hass: HomeAssistant, zone: ZoneConfig): ZoneSensors {
-  const links = resolveLinkedSensorIds(hass, zone) ?? {};
+function resolveSensors(
+  hass: HomeAssistant,
+  zone: ZoneConfig,
+  index?: ReturnType<typeof getEntityIndex>
+): ZoneSensors {
+  const links = resolveLinkedSensorIds(hass, zone, index) ?? {};
   const floorEntity = getEntity(hass, links.floor);
   const roomEntity = getEntity(hass, links.room);
   const humidityEntity = getEntity(hass, links.humidity);
@@ -657,22 +695,21 @@ function zoneKind(
   return 'floor_heat';
 }
 
-function autoDiscoverZones(hass: HomeAssistant): ZoneConfig[] {
-  return Object.values(hass.states)
-    .filter((e) => e.entity_id.startsWith('climate.'))
-    .map((e) => {
-      const rawName =
-        (e.attributes.friendly_name as string | undefined) ??
-        e.entity_id.replace('climate.', '').replace(/_/g, ' ');
-      const area_id = entityAreaId(hass, e.entity_id);
-      return {
-        name: dedupeFriendlyName(rawName),
-        climate_entity: e.entity_id,
-        area: areaName(hass, area_id),
-        area_id,
-      };
-    })
-    .sort((a, b) => a.name.localeCompare(b.name));
+function autoDiscoverZones(hass: HomeAssistant, config: ClimateCommandCenterConfig): ZoneConfig[] {
+  const index = getEntityIndex(hass, config);
+  return index.climateIds.map((eid) => {
+    const e = hass.states[eid];
+    const rawName =
+      (e?.attributes?.friendly_name as string | undefined) ??
+      eid.replace('climate.', '').replace(/_/g, ' ');
+    const area_id = entityAreaId(hass, eid);
+    return {
+      name: dedupeFriendlyName(rawName),
+      climate_entity: eid,
+      area: areaName(hass, area_id),
+      area_id,
+    };
+  });
 }
 
 function inferFloor(name: string, area: string | undefined, floors: FloorConfig[]): string {
@@ -754,13 +791,20 @@ function buildAreaSensor(
   };
 }
 
-function climateLinkedSensorIds(hass: HomeAssistant, config: ClimateCommandCenterConfig, zones: ClimateZone[]): Set<string> {
+function climateLinkedSensorIds(
+  hass: HomeAssistant,
+  config: ClimateCommandCenterConfig,
+  zones: ClimateZone[],
+  index?: ReturnType<typeof getEntityIndex>
+): Set<string> {
   const used = new Set<string>();
   for (const zone of config.zones ?? []) {
     if (zone.floor_sensor) used.add(zone.floor_sensor);
     if (zone.room_sensor) used.add(zone.room_sensor);
     if (zone.humidity_sensor) used.add(zone.humidity_sensor);
   }
+  const tempIds = index?.temperatureSensorIds;
+  const humIds = index?.humiditySensorIds;
   for (const zone of zones) {
     const zc: ZoneConfig = config.zones?.find((z) => z.climate_entity === zone.climate_entity) ?? {
       name: zone.name,
@@ -768,16 +812,90 @@ function climateLinkedSensorIds(hass: HomeAssistant, config: ClimateCommandCente
     };
     for (const id of [
       zc.floor_sensor ??
-        findBestSensor(hass, zone.name, 'floor temperature', 'temperature', zone.climate_entity),
+        findBestSensor(
+          hass,
+          zone.name,
+          'floor temperature',
+          'temperature',
+          zone.climate_entity,
+          tempIds
+        ),
       zc.room_sensor ??
-        findBestSensor(hass, zone.name, 'room temperature', 'temperature', zone.climate_entity),
+        findBestSensor(
+          hass,
+          zone.name,
+          'room temperature',
+          'temperature',
+          zone.climate_entity,
+          tempIds
+        ),
       zc.humidity_sensor ??
-        findBestSensor(hass, zone.name, 'humidity', 'humidity', zone.climate_entity),
+        findBestSensor(hass, zone.name, 'humidity', 'humidity', zone.climate_entity, humIds),
     ]) {
       if (id) used.add(id);
     }
   }
   return used;
+}
+
+function buildAssignableSensorIds(
+  hass: HomeAssistant,
+  config: ClimateCommandCenterConfig,
+  floorHeatIds: Set<string>,
+  candidateSensorIds: string[],
+  zoneConfigs: ZoneConfig[],
+  tempIds: string[],
+  humIds: string[]
+): string[] {
+  const minimalZones: ClimateZone[] = zoneConfigs.map((z) => ({
+    name: z.name,
+    climate_entity: z.climate_entity,
+    kind: 'floor_heat',
+    sensors: {},
+    roomSensors: [],
+    otherSensors: [],
+  }));
+
+  const linked = new Set<string>();
+  for (const zone of config.zones ?? []) {
+    if (zone.floor_sensor) linked.add(zone.floor_sensor);
+    if (zone.room_sensor) linked.add(zone.room_sensor);
+    if (zone.humidity_sensor) linked.add(zone.humidity_sensor);
+  }
+  for (const zone of minimalZones) {
+    const zc: ZoneConfig = config.zones?.find((z) => z.climate_entity === zone.climate_entity) ?? {
+      name: zone.name,
+      climate_entity: zone.climate_entity,
+    };
+    for (const id of [
+      zc.floor_sensor ??
+        findBestSensor(hass, zone.name, 'floor temperature', 'temperature', zone.climate_entity, tempIds),
+      zc.room_sensor ??
+        findBestSensor(hass, zone.name, 'room temperature', 'temperature', zone.climate_entity, tempIds),
+      zc.humidity_sensor ??
+        findBestSensor(hass, zone.name, 'humidity', 'humidity', zone.climate_entity, humIds),
+    ]) {
+      if (id) linked.add(id);
+    }
+  }
+
+  const ids: string[] = [];
+  for (const entityId of candidateSensorIds) {
+    const entity = getEntity(hass, entityId);
+    if (!entity) continue;
+    if (!isClimateSensorEntity(entity)) continue;
+    if (linked.has(entityId)) continue;
+    const nameRaw = friendlyName(entity);
+    if (isExcluded(nameRaw, entityId)) continue;
+    if (isClimateLinkedSensor(entityId, nameRaw, floorHeatIds)) continue;
+    ids.push(entityId);
+  }
+
+  for (const entityId of sensorMap(config).keys()) {
+    if (!ids.includes(entityId)) ids.push(entityId);
+  }
+
+  return ids.sort();
 }
 
 function collectAssignableEntityIds(
@@ -787,18 +905,26 @@ function collectAssignableEntityIds(
 ): string[] {
   if (config.room_sensors?.length) return [...config.room_sensors];
 
-  const linked = climateLinkedSensorIds(hass, config, zones);
-  const floorHeatIds = floorHeatSensorIds(hass);
-  const ids: string[] = [];
+  const index = getEntityIndex(hass, config);
+  if (index.assignableSensorIds) return index.assignableSensorIds;
 
-  for (const entity of Object.values(hass.states)) {
-    if (!entity.entity_id.startsWith('sensor.')) continue;
-    if (!isClimateSensorEntity(entity as HassEntity)) continue;
-    if (linked.has(entity.entity_id)) continue;
-    const nameRaw = friendlyName(entity as HassEntity);
-    if (isExcluded(nameRaw, entity.entity_id)) continue;
-    if (isClimateLinkedSensor(entity.entity_id, nameRaw, floorHeatIds)) continue;
-    ids.push(entity.entity_id);
+  const linked = climateLinkedSensorIds(hass, config, zones, index);
+  const floorHeatIds = index.floorHeatLinkedIds;
+  const ids: string[] = [];
+  const candidates = [
+    ...index.temperatureSensorIds,
+    ...index.humiditySensorIds,
+  ];
+
+  for (const entityId of candidates) {
+    const entity = getEntity(hass, entityId);
+    if (!entity) continue;
+    if (!isClimateSensorEntity(entity)) continue;
+    if (linked.has(entityId)) continue;
+    const nameRaw = friendlyName(entity);
+    if (isExcluded(nameRaw, entityId)) continue;
+    if (isClimateLinkedSensor(entityId, nameRaw, floorHeatIds)) continue;
+    ids.push(entityId);
   }
 
   for (const entityId of sensorMap(config).keys()) {
@@ -833,15 +959,16 @@ function assignSensorToZone(
 }
 
 export function buildZones(hass: HomeAssistant, config: ClimateCommandCenterConfig): ClimateZone[] {
+  const index = getEntityIndex(hass, config);
   const zoneConfigs =
-    config.zones?.length ? config.zones : config.auto_discover ? autoDiscoverZones(hass) : [];
+    config.zones?.length ? config.zones : config.auto_discover ? autoDiscoverZones(hass, config) : [];
 
   return zoneConfigs.map((zone) => {
-    const sensors = resolveSensors(hass, zone);
+    const sensors = resolveSensors(hass, zone, index);
     const area_id = zone.area_id ?? entityAreaId(hass, zone.climate_entity);
     const area = zone.area ?? areaName(hass, area_id);
-    const linked_sensor_ids = resolveLinkedSensorIds(hass, zone);
-    const valves = resolveValves(hass, zone.climate_entity, zone);
+    const linked_sensor_ids = resolveLinkedSensorIds(hass, zone, index);
+    const valves = resolveValves(hass, zone.climate_entity, zone, config);
     const primary = valves[0];
     return {
       name: zone.name,
@@ -1276,12 +1403,7 @@ export function getWeatherData(
   config: ClimateCommandCenterConfig
 ): WeatherData | null {
   // 1. Find the weather entity (prefer weatherflow)
-  const weatherEntityId =
-    config.weather_entity ??
-    Object.keys(hass.states).find(
-      (eid) => eid.startsWith('weather.') && (eid.includes('weatherflow') || eid.includes('tempest'))
-    ) ??
-    Object.keys(hass.states).find((eid) => eid.startsWith('weather.'));
+  const weatherEntityId = resolveWeatherEntityId(hass, config);
 
   const weatherState = weatherEntityId ? getEntity(hass, weatherEntityId) : null;
   const wAttr = weatherState?.attributes ?? {};
@@ -1409,3 +1531,17 @@ export function getSunData(hass: HomeAssistant): SunData | null {
 
   return { state, elevation, azimuth, rising, setting, progress, daylight_minutes, remaining_minutes };
 }
+
+registerEntityIndexDeps({
+  normalize,
+  friendlyName,
+  entityAreaId,
+  climateZoneSlug,
+  isExcluded,
+  isClimateSensorEntity,
+  isClimateLinkedSensor,
+  discoverValveEntityIds,
+  buildAssignableSensorIds,
+});
+
+export { getTrackedEntityIds, trackedStatesChanged, invalidateEntityIndex };

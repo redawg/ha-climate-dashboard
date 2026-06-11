@@ -65,6 +65,20 @@ export interface ClimateCommandCenterConfig {
   google_maps_key?: string;
   /** Show sun tracker card */
   show_sun_tracker?: boolean;
+  /** Binary sensor (or sensor) for WWSD status; auto-detect from SensorLinx outdoor reset when unset */
+  wwsd_entity?: string | false;
+  /** Outdoor temperature entity for WWSD; defaults to weather entity */
+  wwsd_outdoor_temp_entity?: string;
+  /** Shutdown threshold entity for WWSD; defaults to SensorLinx heating curve shutdown temp */
+  wwsd_shutdown_temp_entity?: string;
+}
+
+export interface WwsdState {
+  active: boolean;
+  outdoorTemp?: number;
+  outdoorUnit?: 'F' | 'C';
+  shutdownTemp?: number;
+  shutdownUnit?: 'F' | 'C';
 }
 
 export interface ZoneSensors {
