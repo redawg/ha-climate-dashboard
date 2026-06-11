@@ -739,8 +739,8 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     const heaterBottom = heaterY + heaterH;
     const pipeY = heaterBottom + 14;
     const pipeH = 14;
-    const leftStubX = heaterX + heaterW * 0.36;
-    const rightStubX = heaterX + heaterW * 0.57;
+    const leftStubX = heaterX + heaterW * 0.38;
+    const rightStubX = heaterX + heaterW * 0.55;
 
     return html`
       <div class="floor-system tankless-visual">
@@ -749,20 +749,20 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             <clipPath id="heaterClip">
               <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"/>
             </clipPath>
-            <!-- CFD-style flow: dense arrow-like streaks for inlet (cold return, flows LEFT to RIGHT) -->
+            <!-- CFD-style flow: left-pointing arrows for inlet (cold return, flows RIGHT to LEFT toward tank) -->
             <pattern id="inletFlow" x="0" y="0" width="28" height="16" patternUnits="userSpaceOnUse">
               <rect width="28" height="16" fill="${inletColor}" opacity="0.2"/>
-              <polygon points="28,8 18,5 18,11" fill="${inletColor}" opacity="0.9">
-                <animate attributeName="points" values="28,8 18,5 18,11;0,8 -10,5 -10,11" dur="1.1s" repeatCount="indefinite"/>
+              <polygon points="18,8 28,5 28,11" fill="${inletColor}" opacity="0.9">
+                <animate attributeName="points" values="18,8 28,5 28,11;-10,8 0,5 0,11" dur="1.1s" repeatCount="indefinite"/>
               </polygon>
-              <polygon points="14,8 6,6 6,10" fill="${inletColor}" opacity="0.75">
-                <animate attributeName="points" values="14,8 6,6 6,10;-14,8 -22,6 -22,10" dur="1.1s" repeatCount="indefinite"/>
+              <polygon points="6,8 14,6 14,10" fill="${inletColor}" opacity="0.75">
+                <animate attributeName="points" values="6,8 14,6 14,10;-22,8 -14,6 -14,10" dur="1.1s" repeatCount="indefinite"/>
               </polygon>
-              <polygon points="25,3 19,1.5 19,4.5" fill="${inletColor}" opacity="0.5">
-                <animate attributeName="points" values="25,3 19,1.5 19,4.5;-3,3 -9,1.5 -9,4.5" dur="1.4s" repeatCount="indefinite"/>
+              <polygon points="19,3 25,1.5 25,4.5" fill="${inletColor}" opacity="0.5">
+                <animate attributeName="points" values="19,3 25,1.5 25,4.5;-9,3 -3,1.5 -3,4.5" dur="1.4s" repeatCount="indefinite"/>
               </polygon>
-              <polygon points="10,13 4,11.5 4,14.5" fill="${inletColor}" opacity="0.5">
-                <animate attributeName="points" values="10,13 4,11.5 4,14.5;-18,13 -24,11.5 -24,14.5" dur="1.4s" repeatCount="indefinite"/>
+              <polygon points="4,13 10,11.5 10,14.5" fill="${inletColor}" opacity="0.5">
+                <animate attributeName="points" values="4,13 10,11.5 10,14.5;-24,13 -18,11.5 -18,14.5" dur="1.4s" repeatCount="indefinite"/>
               </polygon>
               <circle r="1.8" cx="22" cy="5" fill="${inletColor}" opacity="0.6">
                 <animate attributeName="cx" from="32" to="4" dur="1.1s" repeatCount="indefinite"/>
