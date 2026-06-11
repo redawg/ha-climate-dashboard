@@ -77,9 +77,16 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     if (!this._forecastUnsub && hass) {
       this._subscribeForecast();
     }
-    if (!prev || prev !== hass || this._floorSystemStatesChanged(prev, hass)) {
+    if (!prev || prev !== hass || this._floorSystemStatesChanged(prev, hass) || this._sunStateChanged(prev, hass)) {
       this.requestUpdate();
     }
+  }
+
+  private _sunStateChanged(prev: HomeAssistant, next: HomeAssistant): boolean {
+    const a = prev.states['sun.sun'];
+    const b = next.states['sun.sun'];
+    if (!a || !b) return a !== b;
+    return a.last_updated !== b.last_updated;
   }
 
   private _floorSystemStatesChanged(prev: HomeAssistant, next: HomeAssistant): boolean {
@@ -1092,7 +1099,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <path d="${arcPath}" fill="none" stroke="rgba(255,235,59,0.15)" stroke-width="1" stroke-dasharray="4,3"/>
 
           <!-- Traveled arc (solid golden) -->
-          ${isUp && travelIdx > 0 ? html`
+          ${isUp && travelIdx > 0 ? svg`
             <path d="${traveledPath}" fill="none" stroke="url(#arcTraveled)" stroke-width="1.8"/>
           ` : ''}
 
@@ -1105,12 +1112,11 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <text x="${setPt.x}" y="${setPt.y + 12}" font-size="7" fill="#FF8A50" font-family="sans-serif" font-weight="600" text-anchor="middle">${setTime}</text>
 
           <!-- Sun glow + sun disc -->
-          ${isUp ? html`
+          ${isUp ? svg`
             <circle cx="${sunPx}" cy="${sunPy}" r="16" fill="url(#sunG)"/>
             <circle cx="${sunPx}" cy="${sunPy}" r="5.5" fill="#FFD54F" stroke="#FFF59D" stroke-width="0.8"/>
-            <!-- Time label near sun -->
             <text x="${sunPx}" y="${sunPy - 12}" font-size="7.5" fill="white" font-family="sans-serif" font-weight="700" text-anchor="middle">${nowTime}</text>
-          ` : html`
+          ` : svg`
             <circle cx="${cx}" cy="${cy - 30}" r="4" fill="rgba(200,200,220,0.6)" stroke="rgba(255,255,255,0.2)" stroke-width="0.5"/>
           `}
 
