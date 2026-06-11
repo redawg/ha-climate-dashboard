@@ -59,77 +59,82 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   @state() private _forecast: ForecastEntry[] | null = null;
 
   private _forecastUnsub?: () => void;
-  private _serverOverrides: Partial<ClimateCommandCenterConfig> = {};
-  private _serverOverridesLoaded = false;
   private _savePending = false;
 
-  private static readonly HA_STORAGE_KEY = 'climate_command_center';
-  private static readonly PERSISTED_KEYS: (keyof ClimateCommandCenterConfig)[] = [
-    'zone_kinds', 'zone_floors', 'sensor_map', 'exclude_entities',
-    'sensor_heights', 'zone_heights', 'floor_system', 'floor_plan',
-  ];
-
   private _persistConfig(config: ClimateCommandCenterConfig): void {
+    this._config = config;
     fireEvent(this, 'config-changed', { config });
-    const persisted: Record<string, unknown> = {};
-    for (const k of ClimateCommandCenterCard.PERSISTED_KEYS) {
-      if (config[k] !== undefined) persisted[k] = config[k];
-    }
-    this._serverOverrides = persisted as Partial<ClimateCommandCenterConfig>;
-    this._saveToServer(persisted);
+    this._saveToLovelace(config);
   }
 
-  private async _saveToServer(data: Record<string, unknown>): Promise<void> {
+  private async _saveToLovelace(cardConfig: ClimateCommandCenterConfig): Promise<void> {
     if (!this._hass || this._savePending) return;
     this._savePending = true;
     try {
-      await this._hass.callWS({
-        type: 'frontend/set_user_data',
-        key: ClimateCommandCenterCard.HA_STORAGE_KEY,
-        value: data,
+      const urlPath = this._detectUrlPath();
+      const lovelaceConfig = await this._hass.callWS<Record<string, unknown>>({
+        type: 'lovelace/config',
+        url_path: urlPath,
       });
+      if (!lovelaceConfig?.views) return;
+      const views = lovelaceConfig.views as Array<{ cards?: Record<string, unknown>[] }>;
+      const clean = { ...cardConfig } as Record<string, unknown>;
+      delete clean['_llInstances'];
+      if (this._findAndReplace(views, clean)) {
+        await this._hass.callWS({
+          type: 'lovelace/config/save',
+          config: lovelaceConfig,
+          url_path: urlPath,
+        });
+      }
     } catch (e) {
-      console.warn('climate-command-center: failed to save settings', e);
+      console.warn('climate-command-center: config save failed', e);
     } finally {
       this._savePending = false;
     }
   }
 
-  private async _loadFromServer(): Promise<void> {
-    if (!this._hass || this._serverOverridesLoaded) return;
-    this._serverOverridesLoaded = true;
-    try {
-      const resp = await this._hass.callWS<{ value: Record<string, unknown> | null }>({
-        type: 'frontend/get_user_data',
-        key: ClimateCommandCenterCard.HA_STORAGE_KEY,
-      });
-      if (resp?.value && typeof resp.value === 'object') {
-        this._serverOverrides = resp.value as Partial<ClimateCommandCenterConfig>;
-        this._applyOverrides();
-      }
-    } catch (e) {
-      console.warn('climate-command-center: failed to load settings', e);
+  private _findAndReplace(
+    views: Array<{ cards?: Record<string, unknown>[] }>,
+    replacement: Record<string, unknown>,
+  ): boolean {
+    for (const view of views) {
+      if (this._replaceInCards(view.cards, replacement)) return true;
     }
+    return false;
   }
 
-  private _applyOverrides(): void {
-    const s = this._serverOverrides;
-    if (!s || !Object.keys(s).length) return;
-    const merged = { ...this._config };
-    if (s.zone_kinds) merged.zone_kinds = { ...(s.zone_kinds ?? {}), ...(this._config.zone_kinds ?? {}) };
-    if (s.zone_floors) merged.zone_floors = { ...(s.zone_floors ?? {}), ...(this._config.zone_floors ?? {}) };
-    if (s.sensor_map) merged.sensor_map = { ...(s.sensor_map ?? {}), ...(this._config.sensor_map ?? {}) };
-    if (s.sensor_heights) merged.sensor_heights = { ...(s.sensor_heights ?? {}), ...(this._config.sensor_heights ?? {}) };
-    if (s.zone_heights) merged.zone_heights = { ...(s.zone_heights ?? {}), ...(this._config.zone_heights ?? {}) };
-    if (s.exclude_entities && !this._config.exclude_entities?.length) merged.exclude_entities = s.exclude_entities;
-    if (s.floor_system !== undefined && this._config.floor_system === undefined) merged.floor_system = s.floor_system;
-    if (s.floor_plan && !this._config.floor_plan) merged.floor_plan = s.floor_plan;
-    this._config = merged as ClimateCommandCenterConfig;
-    this._floorSystemEntityIds = undefined;
-    if (this._hass) {
-      this._floorSystemEntityIds = discoverFloorSystemEntityIds(this._hass, this._config);
+  private _replaceInCards(
+    cards: Record<string, unknown>[] | undefined,
+    replacement: Record<string, unknown>,
+  ): boolean {
+    if (!cards) return false;
+    for (let i = 0; i < cards.length; i++) {
+      const card = cards[i];
+      if (card.type === 'custom:climate-command-center') {
+        cards[i] = replacement;
+        return true;
+      }
+      const nested = (card.cards ?? card.card) as Record<string, unknown>[] | Record<string, unknown> | undefined;
+      if (Array.isArray(nested) && this._replaceInCards(nested, replacement)) return true;
+      if (nested && !Array.isArray(nested) && (nested as Record<string, unknown>).type === 'custom:climate-command-center') {
+        if (card.card) card.card = replacement;
+        return true;
+      }
     }
-    this.requestUpdate();
+    return false;
+  }
+
+  private _detectUrlPath(): string | null {
+    try {
+      const path = window.location.pathname;
+      const match = path.match(/^\/([^/]+)/);
+      const segment = match?.[1];
+      if (!segment || segment === 'lovelace') return null;
+      return segment;
+    } catch {
+      return null;
+    }
   }
 
   static get styles(): CSSResultGroup {
@@ -148,9 +153,6 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     }
     if (!this._forecastUnsub && hass) {
       this._subscribeForecast();
-    }
-    if (!this._serverOverridesLoaded && hass) {
-      this._loadFromServer();
     }
     if (!prev || prev !== hass || this._floorSystemStatesChanged(prev, hass) || this._sunStateChanged(prev, hass)) {
       this.requestUpdate();
