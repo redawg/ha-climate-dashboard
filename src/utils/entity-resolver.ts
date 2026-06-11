@@ -16,6 +16,7 @@ import {
   WeatherData,
   ZoneConfig,
   ZoneSensors,
+  ZoneValve,
 } from '../types';
 
 const WEATHER_PATTERNS = [
@@ -425,11 +426,22 @@ function findBestSensor(
   return best?.id;
 }
 
-function resolveValve(
+function valveFromBinaryState(entity_id: string, state: string): ZoneValve {
+  const active = state === 'on';
+  return { entity_id, position: active ? 100 : 0, active };
+}
+
+function valveFromNumericState(entity_id: string, state: string): ZoneValve | undefined {
+  const pos = parseFloat(state);
+  if (isNaN(pos)) return undefined;
+  return { entity_id, position: pos, active: pos > 0 };
+}
+
+function resolveValves(
   hass: HomeAssistant,
   climateEntity: string,
   zoneConfig?: ZoneConfig
-): { entity_id?: string; position?: number; active?: boolean } {
+): ZoneValve[] {
   const slug = climateZoneSlug(climateEntity);
   const slugTokens = slug.split('_').filter((t) => t.length > 2);
   const slugNorm = normalize(slug.replace(/_/g, ' '));
@@ -439,27 +451,24 @@ function resolveValve(
   if (zoneConfig?.valve_entity) {
     const state = states[zoneConfig.valve_entity];
     if (state) {
-      const numVal = parseFloat(state.state);
-      if (!isNaN(numVal)) {
-        return { entity_id: zoneConfig.valve_entity, position: numVal, active: numVal > 0 };
-      }
-      const active = state.state === 'on';
-      return { entity_id: zoneConfig.valve_entity, position: active ? 100 : 0, active };
+      const numeric = valveFromNumericState(zoneConfig.valve_entity, state.state);
+      if (numeric) return [numeric];
+      return [valveFromBinaryState(zoneConfig.valve_entity, state.state)];
     }
   }
 
   // 2. Try slug + "valve" matching (existing logic for generic integrations)
+  const slugValves: ZoneValve[] = [];
   for (const [eid, state] of Object.entries(states)) {
     if (!eid.includes(slug) || !eid.includes('valve')) continue;
     if (eid.startsWith('number.') || eid.startsWith('sensor.')) {
-      const pos = parseFloat(state.state);
-      return { entity_id: eid, position: isNaN(pos) ? undefined : pos, active: !isNaN(pos) && pos > 0 };
-    }
-    if (eid.startsWith('switch.') || eid.startsWith('binary_sensor.')) {
-      const active = state.state === 'on';
-      return { entity_id: eid, position: active ? 100 : 0, active };
+      const numeric = valveFromNumericState(eid, state.state);
+      if (numeric) slugValves.push(numeric);
+    } else if (eid.startsWith('switch.') || eid.startsWith('binary_sensor.')) {
+      slugValves.push(valveFromBinaryState(eid, state.state));
     }
   }
+  if (slugValves.length) return slugValves;
 
   // 3. SensorLinx / HBX per-zone floor control (zone calling for hydronic flow)
   for (const [eid, state] of Object.entries(states)) {
@@ -471,11 +480,10 @@ function resolveValve(
       normalize(suffix) === normalize(slug) ||
       suffixNorm === normalize(slug.replace(/_/g, ' '));
     if (!slugMatch) continue;
-    const active = state.state === 'on';
-    return { entity_id: eid, position: active ? 100 : 0, active };
+    return [valveFromBinaryState(eid, state.state)];
   }
 
-  // 4. Redawghome zone relays: aggregate zone valves for this climate slug
+  // 4. Redawghome zone relays: each zone relay is its own valve
   const redawghomeZones = Object.entries(states).filter(
     ([eid]) => eid.startsWith('binary_sensor.') && eid.includes('redawghome_zone')
   );
@@ -525,19 +533,14 @@ function resolveValve(
           });
 
     if (assigned.length) {
-      const active = assigned.some(({ state }) => state.state === 'on');
-      const primary = assigned.find(({ state }) => state.state === 'on') ?? assigned[0];
-      return {
-        entity_id: primary.eid,
-        position: active ? 100 : 0,
-        active,
-      };
+      return assigned.map(({ eid, state }) => valveFromBinaryState(eid, state.state));
     }
   }
 
   // 5. HBX-style: binary_sensor with device_class running/heat in same area
   const climateAreaId = entityAreaId(hass, climateEntity);
   if (climateAreaId) {
+    const areaValves: ZoneValve[] = [];
     for (const [eid, state] of Object.entries(states)) {
       if (!eid.startsWith('binary_sensor.')) continue;
       const attrs = state.attributes as Record<string, unknown>;
@@ -556,16 +559,17 @@ function resolveValve(
 
       const sensorAreaId = entityAreaId(hass, eid);
       if (sensorAreaId === climateAreaId) {
-        const active = state.state === 'on';
-        return { entity_id: eid, position: active ? 100 : 0, active };
+        areaValves.push(valveFromBinaryState(eid, state.state));
       }
     }
+    if (areaValves.length) return areaValves;
   }
 
   // 6. Fallback: match by zone name in friendly_name
   const climateState = states[climateEntity];
   const climateName = normalize((climateState?.attributes?.friendly_name as string) ?? '');
   if (climateName) {
+    const nameValves: ZoneValve[] = [];
     for (const [eid, state] of Object.entries(states)) {
       if (!eid.startsWith('binary_sensor.')) continue;
       const attrs = state.attributes as Record<string, unknown>;
@@ -579,13 +583,28 @@ function resolveValve(
         .filter((t) => t.length > 2);
       const matches = nameTokens.some((token) => friendlyName.includes(token));
       if (matches) {
-        const active = state.state === 'on';
-        return { entity_id: eid, position: active ? 100 : 0, active };
+        nameValves.push(valveFromBinaryState(eid, state.state));
       }
     }
+    if (nameValves.length) return nameValves;
   }
 
-  return {};
+  return [];
+}
+
+function resolveValve(
+  hass: HomeAssistant,
+  climateEntity: string,
+  zoneConfig?: ZoneConfig
+): { entity_id?: string; position?: number; active?: boolean } {
+  const valves = resolveValves(hass, climateEntity, zoneConfig);
+  if (!valves.length) return {};
+  const first = valves[0];
+  return {
+    entity_id: first.entity_id,
+    position: first.position,
+    active: first.active,
+  };
 }
 
 function resolveLinkedSensorIds(
@@ -819,7 +838,8 @@ export function buildZones(hass: HomeAssistant, config: ClimateCommandCenterConf
     const area_id = zone.area_id ?? entityAreaId(hass, zone.climate_entity);
     const area = zone.area ?? areaName(hass, area_id);
     const linked_sensor_ids = resolveLinkedSensorIds(hass, zone);
-    const valve = resolveValve(hass, zone.climate_entity, zone);
+    const valves = resolveValves(hass, zone.climate_entity, zone);
+    const primary = valves[0];
     return {
       name: zone.name,
       climate_entity: zone.climate_entity,
@@ -831,9 +851,10 @@ export function buildZones(hass: HomeAssistant, config: ClimateCommandCenterConf
       roomSensors: [],
       otherSensors: [],
       linked_sensor_ids,
-      valve_entity: valve.entity_id,
-      valve_position: valve.position,
-      valve_active: valve.active,
+      valves: valves.length ? valves : undefined,
+      valve_entity: primary?.entity_id,
+      valve_position: primary?.position,
+      valve_active: primary?.active,
     };
   });
 }

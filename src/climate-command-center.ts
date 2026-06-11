@@ -581,78 +581,112 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   }
 
   private renderValveLine(zone: ClimateZone): TemplateResult | null {
-    if (zone.valve_entity == null) return null;
+    const valves =
+      zone.valves?.length
+        ? zone.valves
+        : zone.valve_entity
+          ? [
+              {
+                entity_id: zone.valve_entity,
+                position: zone.valve_position ?? 0,
+                active: zone.valve_active === true,
+              },
+            ]
+          : [];
+    if (!valves.length) return null;
 
     const floorTemp = zone.sensors.floor;
     const color = this.tempToColor(floorTemp);
-    const active = zone.valve_active === true;
-    const position = zone.valve_position;
-    const patternId = `valve-flow-${zone.climate_entity.replace(/\./g, '-')}`;
-    const bgFill = active
-      ? color.replace('rgb(', 'rgba(').replace(')', ',0.1)')
-      : 'rgba(100,100,120,0.15)';
+    const zoneSlug = zone.climate_entity.replace(/\./g, '-');
 
     return html`
-      <div class="valve-line">
-        <svg class="valve-svg" viewBox="0 0 280 20" preserveAspectRatio="xMidYMid meet">
-          <defs>
-            ${active
-              ? html`
-                  <pattern id="${patternId}" x="0" y="0" width="20" height="12" patternUnits="userSpaceOnUse">
-                    <circle r="2" cx="5" cy="6" fill="${color}" opacity="0.7">
-                      <animate attributeName="cx" from="-5" to="25" dur="1s" repeatCount="indefinite" />
-                    </circle>
-                    <circle r="1.5" cx="15" cy="6" fill="${color}" opacity="0.5">
-                      <animate attributeName="cx" from="5" to="35" dur="1s" repeatCount="indefinite" />
-                    </circle>
-                  </pattern>
-                `
-              : ''}
-          </defs>
-          <rect
-            x="10"
-            y="4"
-            width="200"
-            height="12"
-            rx="6"
-            fill="${bgFill}"
-            stroke="${active ? color : 'rgba(150,150,170,0.3)'}"
-            stroke-width="1"
-          />
-          <rect
-            x="12"
-            y="6"
-            width="196"
-            height="8"
-            rx="4"
-            fill="${active ? `url(#${patternId})` : 'rgba(100,130,160,0.2)'}"
-          />
-          <text
-            x="225"
-            y="14"
-            font-size="10"
-            fill="${active ? color : 'rgba(150,150,170,0.5)'}"
-            font-family="sans-serif"
-            font-weight="600"
-          >
-            ${active ? '🔓' : '🔒'}
-          </text>
-          ${position != null
-            ? html`
-                <text
-                  x="250"
-                  y="14"
-                  font-size="9"
-                  fill="${active ? color : 'rgba(150,150,170,0.5)'}"
-                  font-family="sans-serif"
-                  font-weight="600"
-                >
-                  ${position}%
-                </text>
-              `
-            : ''}
-        </svg>
-      </div>
+      ${valves.map((valve, index) => {
+        const active = valve.active;
+        const position = valve.position;
+        const valveSlug = valve.entity_id.replace(/\./g, '-');
+        const patternId = `valve-flow-${zoneSlug}-${valveSlug}-${index}`;
+        const bgFill = active
+          ? color.replace('rgb(', 'rgba(').replace(')', ',0.1)')
+          : 'rgba(100,100,120,0.15)';
+
+        return html`
+          <div class="valve-line">
+            <svg class="valve-svg" viewBox="0 0 280 20" preserveAspectRatio="xMidYMid meet">
+              <defs>
+                ${active
+                  ? html`
+                      <pattern
+                        id="${patternId}"
+                        x="0"
+                        y="0"
+                        width="20"
+                        height="12"
+                        patternUnits="userSpaceOnUse"
+                      >
+                        <circle r="2" cx="5" cy="6" fill="${color}" opacity="0.7">
+                          <animate
+                            attributeName="cx"
+                            from="-5"
+                            to="25"
+                            dur="1s"
+                            repeatCount="indefinite"
+                          />
+                        </circle>
+                        <circle r="1.5" cx="15" cy="6" fill="${color}" opacity="0.5">
+                          <animate
+                            attributeName="cx"
+                            from="5"
+                            to="35"
+                            dur="1s"
+                            repeatCount="indefinite"
+                          />
+                        </circle>
+                      </pattern>
+                    `
+                  : ''}
+              </defs>
+              <rect
+                x="10"
+                y="4"
+                width="200"
+                height="12"
+                rx="6"
+                fill="${bgFill}"
+                stroke="${active ? color : 'rgba(150,150,170,0.3)'}"
+                stroke-width="1"
+              />
+              <rect
+                x="12"
+                y="6"
+                width="196"
+                height="8"
+                rx="4"
+                fill="${active ? `url(#${patternId})` : 'rgba(100,130,160,0.2)'}"
+              />
+              <text
+                x="225"
+                y="14"
+                font-size="10"
+                fill="${active ? color : 'rgba(150,150,170,0.5)'}"
+                font-family="sans-serif"
+                font-weight="600"
+              >
+                ${active ? '🔓' : '🔒'}
+              </text>
+              <text
+                x="250"
+                y="14"
+                font-size="9"
+                fill="${active ? color : 'rgba(150,150,170,0.5)'}"
+                font-family="sans-serif"
+                font-weight="600"
+              >
+                ${position}%
+              </text>
+            </svg>
+          </div>
+        `;
+      })}
     `;
   }
 

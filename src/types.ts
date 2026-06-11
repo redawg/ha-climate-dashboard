@@ -84,6 +84,12 @@ export interface AreaSensor {
   height_ft?: number;
 }
 
+export interface ZoneValve {
+  entity_id: string;
+  position: number;
+  active: boolean;
+}
+
 export interface ClimateZone {
   name: string;
   climate_entity: string;
@@ -99,8 +105,12 @@ export interface ClimateZone {
     room?: string;
     humidity?: string;
   };
+  valves?: ZoneValve[];
+  /** @deprecated Use valves[0] — kept for backward compatibility */
   valve_entity?: string;
+  /** @deprecated Use valves[0] — kept for backward compatibility */
   valve_position?: number;
+  /** @deprecated Use valves[0] — kept for backward compatibility */
   valve_active?: boolean;
 }
 
