@@ -794,7 +794,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     const pipeY = heaterBottom + 14;
     const pipeH = 14;
     const leftStubX = heaterX + heaterW * 0.24;
-    const rightStubX = heaterX + heaterW * 0.48;
+    const rightStubX = heaterX + heaterW * 0.72;
 
     return html`
       <div class="floor-system tankless-visual">
