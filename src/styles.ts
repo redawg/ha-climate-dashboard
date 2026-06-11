@@ -366,6 +366,7 @@ export const styles: CSSResultGroup = css`
   }
 
   .zone-card {
+    position: relative;
     padding: 14px;
     border-radius: 14px;
     background: var(--secondary-background-color, rgba(255, 255, 255, 0.04));
@@ -373,6 +374,7 @@ export const styles: CSSResultGroup = css`
     border-left: 3px solid var(--primary-color, #0288d1);
     transition: border-color 0.2s, box-shadow 0.2s, transform 0.15s;
     cursor: pointer;
+    overflow: hidden;
   }
 
   .zone-card:hover {
@@ -491,6 +493,40 @@ export const styles: CSSResultGroup = css`
     background: linear-gradient(180deg, rgba(66, 165, 245, 0.08), transparent 60%);
     border-left-color: #42a5f5;
     border-left-width: 4px;
+  }
+
+  .zone-card.floor_heat.action-heating::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: repeating-linear-gradient(
+      90deg,
+      rgba(255, 112, 67, 0.1),
+      rgba(255, 112, 67, 0.6) 25%,
+      rgba(255, 180, 100, 0.8) 50%,
+      rgba(255, 112, 67, 0.6) 75%,
+      rgba(255, 112, 67, 0.1)
+    );
+    background-size: 200% 100%;
+    animation: flowAccent 2s linear infinite;
+    border-radius: 0 0 12px 12px;
+  }
+
+  @keyframes flowAccent {
+    from { background-position: 200% 0; }
+    to { background-position: 0 0; }
+  }
+
+  .hydronic-loop {
+    padding: 4px 8px 2px;
+  }
+
+  .hydronic-svg {
+    width: 100%;
+    height: 40px;
   }
 
   .zone-area-label {

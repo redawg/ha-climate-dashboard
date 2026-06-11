@@ -716,6 +716,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   }
 
   private renderValveLine(zone: ClimateZone): TemplateResult | null {
+    if (zone.kind === 'thermostat') return null;
     const valves =
       zone.valves?.length
         ? zone.valves
@@ -822,6 +823,91 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           </div>
         `;
       })}
+    `;
+  }
+
+  private renderHydronicLoop(zone: ClimateZone, hvacAction: string | undefined): TemplateResult | null {
+    if (zone.kind === 'thermostat') return null;
+
+    const valves =
+      zone.valves?.length
+        ? zone.valves
+        : zone.valve_entity
+          ? [{ entity_id: zone.valve_entity, position: zone.valve_position ?? 0, active: zone.valve_active === true }]
+          : [];
+
+    const anyActive = valves.some((v) => v.active);
+    const isHeating = hvacAction === 'heating' || anyActive;
+    const floorTemp = zone.sensors.floor;
+    const color = this.tempToColor(floorTemp);
+    const zoneSlug = zone.climate_entity.replace(/\./g, '-');
+
+    const supplyPath = 'M 10,12 L 270,12 Q 280,12 280,22 L 280,32';
+    const returnPath = 'M 280,32 Q 280,42 270,42 L 10,42';
+
+    const mutedPipe = 'rgba(100,110,130,0.25)';
+    const mutedStroke = 'rgba(130,130,150,0.2)';
+    const activeFill = color.replace('rgb(', 'rgba(').replace(')', ',0.12)');
+
+    return html`
+      <div class="hydronic-loop">
+        <svg class="hydronic-svg" viewBox="0 0 290 54" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            ${isHeating ? svg`
+              <pattern id="hflow-s-${zoneSlug}" x="0" y="0" width="24" height="10" patternUnits="userSpaceOnUse">
+                <circle r="2.2" cx="6" cy="5" fill="${color}" opacity="0.75">
+                  <animate attributeName="cx" from="-6" to="30" dur="1.2s" repeatCount="indefinite"/>
+                </circle>
+                <circle r="1.6" cx="18" cy="5" fill="${color}" opacity="0.55">
+                  <animate attributeName="cx" from="6" to="42" dur="1.2s" repeatCount="indefinite"/>
+                </circle>
+                <circle r="1.2" cx="12" cy="3" fill="${color}" opacity="0.4">
+                  <animate attributeName="cx" from="0" to="36" dur="1.5s" repeatCount="indefinite"/>
+                </circle>
+              </pattern>
+              <pattern id="hflow-r-${zoneSlug}" x="0" y="0" width="24" height="10" patternUnits="userSpaceOnUse">
+                <circle r="2.2" cx="18" cy="5" fill="${color}" opacity="0.6">
+                  <animate attributeName="cx" from="30" to="-6" dur="1.4s" repeatCount="indefinite"/>
+                </circle>
+                <circle r="1.6" cx="6" cy="5" fill="${color}" opacity="0.45">
+                  <animate attributeName="cx" from="42" to="6" dur="1.4s" repeatCount="indefinite"/>
+                </circle>
+                <circle r="1.2" cx="12" cy="7" fill="${color}" opacity="0.35">
+                  <animate attributeName="cx" from="36" to="0" dur="1.7s" repeatCount="indefinite"/>
+                </circle>
+              </pattern>
+            ` : ''}
+          </defs>
+
+          <!-- Supply pipe (top, left to right) -->
+          <path d="${supplyPath}" fill="none" stroke="${isHeating ? color : mutedStroke}" stroke-width="8" stroke-linecap="round" opacity="0.3"/>
+          <path d="${supplyPath}" fill="none" stroke="${isHeating ? `url(#hflow-s-${zoneSlug})` : mutedPipe}" stroke-width="6" stroke-linecap="round"/>
+
+          <!-- Return pipe (bottom, right to left) -->
+          <path d="${returnPath}" fill="none" stroke="${isHeating ? color : mutedStroke}" stroke-width="8" stroke-linecap="round" opacity="0.3"/>
+          <path d="${returnPath}" fill="none" stroke="${isHeating ? `url(#hflow-r-${zoneSlug})` : mutedPipe}" stroke-width="6" stroke-linecap="round"/>
+
+          <!-- Supply label -->
+          <text x="14" y="9" font-size="5.5" fill="${isHeating ? color : 'rgba(150,150,170,0.5)'}" font-family="sans-serif" font-weight="700" opacity="0.7">SUPPLY</text>
+          <!-- Return label -->
+          <text x="14" y="50" font-size="5.5" fill="${isHeating ? color : 'rgba(150,150,170,0.5)'}" font-family="sans-serif" font-weight="700" opacity="0.7">RETURN</text>
+
+          <!-- Valve indicators along supply pipe -->
+          ${valves.map((v, i) => {
+            const spacing = 240 / (valves.length + 1);
+            const vx = 20 + spacing * (i + 1);
+            return svg`
+              <rect x="${vx - 5}" y="${isHeating && v.active ? 7 : 8}" width="10" height="${isHeating && v.active ? 10 : 8}" rx="2"
+                fill="${v.active ? activeFill : 'rgba(80,80,100,0.3)'}"
+                stroke="${v.active ? color : 'rgba(120,120,140,0.4)'}" stroke-width="0.8"/>
+              <text x="${vx}" y="${v.active ? 21 : 19}" font-size="5" text-anchor="middle"
+                fill="${v.active ? color : 'rgba(150,150,170,0.5)'}" font-family="sans-serif" font-weight="600">
+                ${v.active ? '▲' : '▼'}
+              </text>
+            `;
+          })}
+        </svg>
+      </div>
     `;
   }
 
@@ -1468,6 +1554,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
               : ''}
         </div>
 
+        ${this.renderHydronicLoop(zone, hvacAction)}
         ${this.renderValveLine(zone)}
 
         ${this.renderZoneHeightStats(zone, current)}
