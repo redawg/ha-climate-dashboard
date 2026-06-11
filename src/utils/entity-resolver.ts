@@ -12,6 +12,7 @@ import {
   ForecastEntry,
   HaAreaOption,
   HassEntity,
+  SunData,
   WeatherData,
   ZoneConfig,
   ZoneSensors,
@@ -65,6 +66,24 @@ const EXCLUDE_PATTERNS = [
   'uxg',
   'udr',
   'unvr',
+  // UniFi - block ALL entities from the UniFi integration
+  'unifi_',
+  'dream machine',
+  'dream router',
+  'ultra switch',
+  'ap ',
+  'ap_backyard',
+  'ap_',
+  'xgs',
+  '_poe',
+  'port_',
+  'clients',
+  'wlan',
+  'speedtest',
+  'wan ',
+  'lan ',
+  'firmware',
+  'device tracker',
   'poe temperature',
   'switch temperature',
   // Network device metrics (CPU, memory, uptime, signal)
@@ -84,6 +103,12 @@ const EXCLUDE_PATTERNS = [
   'laserjet',
   'envy',
   'deskjet',
+  // Tankless water heater sensors (displayed in floor system card)
+  'tankless',
+  'water heater',
+  'hot water',
+  'inlet temp',
+  'outlet temp',
   ...WEATHER_PATTERNS,
 ];
 
@@ -766,10 +791,15 @@ const FLOOR_SYSTEM_PATTERNS = [
   'water_temp',
   'pump',
   'optimal',
+  'inlet',
+  'outlet',
+  'water heater',
+  'tankless',
+  'hot water',
 ];
 
-const FLOOR_SUPPLY_HINTS = ['supply', 'supply temp', 'supply water', 'supply temperature'];
-const FLOOR_RETURN_HINTS = ['return', 'return temp', 'return water', 'return temperature'];
+const FLOOR_SUPPLY_HINTS = ['supply', 'supply temp', 'supply water', 'supply temperature', 'outlet', 'outlet temp', 'hot water', 'outgoing'];
+const FLOOR_RETURN_HINTS = ['return', 'return temp', 'return water', 'return temperature', 'inlet', 'inlet temp', 'cold water', 'incoming'];
 const FLOOR_FLOW_HINTS = ['flow rate', 'flow', 'water flow'];
 const FLOOR_PUMP_HINTS = ['pump', 'boiler', 'circulator', 'manifold pump'];
 
@@ -1044,4 +1074,39 @@ export function getWeatherData(
   }
 
   return result;
+}
+
+export function getSunData(hass: HomeAssistant): SunData | null {
+  const sun = getEntity(hass, 'sun.sun');
+  if (!sun) return null;
+
+  const elevation = (sun.attributes.elevation as number) ?? 0;
+  const azimuth = (sun.attributes.azimuth as number) ?? 180;
+  const state = sun.state as 'above_horizon' | 'below_horizon';
+
+  const risingStr = sun.attributes.next_rising as string;
+  const settingStr = sun.attributes.next_setting as string;
+  if (!risingStr || !settingStr) return null;
+
+  let rising = new Date(risingStr);
+  let setting = new Date(settingStr);
+  const now = new Date();
+
+  if (state === 'above_horizon') {
+    const todayRise = new Date(rising.getTime() - 24 * 60 * 60 * 1000);
+    rising = todayRise;
+  } else {
+    const yesterdaySet = new Date(setting.getTime() - 24 * 60 * 60 * 1000);
+    setting = yesterdaySet;
+    const yesterdayRise = new Date(rising.getTime() - 24 * 60 * 60 * 1000);
+    rising = yesterdayRise;
+  }
+
+  const totalMs = setting.getTime() - rising.getTime();
+  const elapsedMs = now.getTime() - rising.getTime();
+  const progress = totalMs > 0 ? elapsedMs / totalMs : 0;
+  const daylight_minutes = Math.round(totalMs / 60000);
+  const remaining_minutes = Math.max(0, Math.round((setting.getTime() - now.getTime()) / 60000));
+
+  return { state, elevation, azimuth, rising, setting, progress, daylight_minutes, remaining_minutes };
 }

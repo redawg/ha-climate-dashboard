@@ -10,6 +10,7 @@ import {
   FloorPlanThermostat,
   FloorSection,
   FloorSystemData,
+  SunData,
   WeatherData,
   ZoneSensors,
 } from './types';
@@ -19,6 +20,7 @@ import {
   DEFAULT_FLOORS,
   floorNames,
   getWeatherData,
+  getSunData,
   autoAssignSensorToZone,
   listHaAreas,
   resolveFloorSystem,
@@ -108,12 +110,12 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       ) => Promise<() => void> }).subscribeMessage(
         (msg) => {
           if (msg.forecast) {
-            this._forecast = msg.forecast.slice(0, 5);
+            this._forecast = msg.forecast.slice(0, 8);
           }
         },
         {
           type: 'weather/subscribe_forecast',
-          forecast_type: 'daily',
+          forecast_type: 'hourly',
           entity_id: weatherEntityId,
         }
       );
@@ -144,6 +146,10 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
 
   private get floorSystem(): FloorSystemData | null {
     return resolveFloorSystem(this.hass, this._config);
+  }
+
+  private get sunData(): SunData | null {
+    return getSunData(this.hass);
   }
 
   private get totalZones(): number {
@@ -365,80 +371,129 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     return Math.round((current - target) * 10) / 10;
   }
 
+  private tempToColor(temp: number | undefined): string {
+    if (temp == null) return '#64b5f6';
+    // Map temperature range: 50°F=cold blue, 90°F=warm orange, 130°F+=hot red
+    const t = Math.max(50, Math.min(140, temp));
+    const ratio = (t - 50) / 90;
+    if (ratio < 0.33) {
+      // Blue to cyan
+      const r = Math.round(30 + ratio * 3 * 70);
+      const g = Math.round(130 + ratio * 3 * 70);
+      const b = Math.round(245 - ratio * 3 * 50);
+      return `rgb(${r},${g},${b})`;
+    } else if (ratio < 0.66) {
+      // Cyan to orange
+      const subRatio = (ratio - 0.33) / 0.33;
+      const r = Math.round(100 + subRatio * 155);
+      const g = Math.round(200 - subRatio * 50);
+      const b = Math.round(195 - subRatio * 145);
+      return `rgb(${r},${g},${b})`;
+    } else {
+      // Orange to red
+      const subRatio = (ratio - 0.66) / 0.34;
+      const r = Math.round(255);
+      const g = Math.round(150 - subRatio * 80);
+      const b = Math.round(50 - subRatio * 30);
+      return `rgb(${r},${g},${b})`;
+    }
+  }
+
   private renderFloorSystem(): TemplateResult | null {
     const data = this.floorSystem;
     if (!data) return null;
 
+    const inletTemp = data.return_temp?.value; // inlet = cold return
+    const outletTemp = data.supply_temp?.value; // outlet = hot supply
+    const inletColor = this.tempToColor(inletTemp);
+    const outletColor = this.tempToColor(outletTemp);
+    const inletUnit = data.return_temp?.unit ?? '°';
+    const outletUnit = data.supply_temp?.unit ?? '°';
+
     return html`
-      <div class="floor-system">
-        <div class="floor-system-header">
-          <span class="floor-system-icon">\uD83D\uDEB0</span>
-          <span class="floor-system-title">Floor Water Supply</span>
-        </div>
-        <div class="floor-system-metrics">
-          ${data.supply_temp
-            ? html`
-                <div class="floor-system-metric supply">
-                  <span class="floor-system-metric-label">Supply</span>
-                  <span class="floor-system-metric-value">
-                    ${data.supply_temp.value}${data.supply_temp.unit}
-                  </span>
-                </div>
-              `
-            : ''}
-          ${data.return_temp
-            ? html`
-                <div class="floor-system-metric return">
-                  <span class="floor-system-metric-label">Return</span>
-                  <span class="floor-system-metric-value">
-                    ${data.return_temp.value}${data.return_temp.unit}
-                  </span>
-                </div>
-              `
-            : ''}
+      <div class="floor-system tankless-visual">
+        <svg class="tankless-svg" viewBox="0 0 400 160" preserveAspectRatio="xMidYMid meet">
+          <defs>
+            <!-- Animated flow particles for inlet (cold) pipe -->
+            <pattern id="inletFlow" x="0" y="0" width="20" height="10" patternUnits="userSpaceOnUse">
+              <circle r="2.5" cx="5" cy="5" fill="${inletColor}" opacity="0.7">
+                <animate attributeName="cx" from="-5" to="25" dur="1.2s" repeatCount="indefinite"/>
+              </circle>
+              <circle r="1.8" cx="15" cy="5" fill="${inletColor}" opacity="0.5">
+                <animate attributeName="cx" from="5" to="35" dur="1.2s" repeatCount="indefinite"/>
+              </circle>
+            </pattern>
+            <!-- Animated flow particles for outlet (hot) pipe -->
+            <pattern id="outletFlow" x="0" y="0" width="20" height="10" patternUnits="userSpaceOnUse">
+              <circle r="2.5" cx="5" cy="5" fill="${outletColor}" opacity="0.7">
+                <animate attributeName="cx" from="-5" to="25" dur="0.9s" repeatCount="indefinite"/>
+              </circle>
+              <circle r="1.8" cx="15" cy="5" fill="${outletColor}" opacity="0.5">
+                <animate attributeName="cx" from="5" to="35" dur="0.9s" repeatCount="indefinite"/>
+              </circle>
+            </pattern>
+          </defs>
+
+          <!-- Inlet pipe (cold, bottom) -->
+          <rect x="0" y="105" width="130" height="14" rx="7" fill="rgba(100,181,246,0.15)" stroke="${inletColor}" stroke-width="1.5"/>
+          <rect x="5" y="107" width="120" height="10" rx="5" fill="url(#inletFlow)"/>
+
+          <!-- Outlet pipe (hot, top) -->
+          <rect x="270" y="45" width="130" height="14" rx="7" fill="rgba(255,183,77,0.15)" stroke="${outletColor}" stroke-width="1.5"/>
+          <rect x="275" y="47" width="120" height="10" rx="5" fill="url(#outletFlow)"/>
+
+          <!-- Tankless water heater body -->
+          <rect x="130" y="20" width="140" height="120" rx="10" fill="rgba(60,60,80,0.9)" stroke="rgba(255,255,255,0.2)" stroke-width="1.5"/>
+
+          <!-- Heater inner panel -->
+          <rect x="145" y="35" width="110" height="50" rx="5" fill="rgba(30,30,45,0.8)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+
+          <!-- Flame icons inside heater -->
+          <text x="175" y="68" font-size="22" text-anchor="middle" fill="#ff7043" opacity="0.9">🔥</text>
+          <text x="200" y="63" font-size="28" text-anchor="middle" fill="#ff9800">🔥</text>
+          <text x="225" y="68" font-size="22" text-anchor="middle" fill="#ff7043" opacity="0.9">🔥</text>
+
+          <!-- Heater label -->
+          <text x="200" y="108" font-size="10" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="sans-serif" font-weight="600" letter-spacing="0.5">TANKLESS</text>
+          <text x="200" y="122" font-size="8" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="sans-serif" letter-spacing="0.3">WATER HEATER</text>
+
+          <!-- Connection pipes from unit to main pipes -->
+          <!-- Inlet connection (bottom-left of heater to inlet pipe) -->
+          <path d="M 155 140 L 155 112 Q 130 112 130 112" fill="none" stroke="${inletColor}" stroke-width="2" opacity="0.6"/>
+          <!-- Outlet connection (top-right of heater to outlet pipe) -->
+          <path d="M 245 40 L 245 52 Q 270 52 270 52" fill="none" stroke="${outletColor}" stroke-width="2" opacity="0.6"/>
+
+          <!-- Inlet temp label -->
+          <text x="60" y="100" font-size="11" text-anchor="middle" fill="${inletColor}" font-family="sans-serif" font-weight="700">${inletTemp != null ? `${inletTemp}${inletUnit}` : '—'}</text>
+          <text x="60" y="133" font-size="8" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="sans-serif" font-weight="600">INLET</text>
+
+          <!-- Outlet temp label -->
+          <text x="340" y="40" font-size="11" text-anchor="middle" fill="${outletColor}" font-family="sans-serif" font-weight="700">${outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
+          <text x="340" y="73" font-size="8" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="sans-serif" font-weight="600">OUTLET</text>
+
+          <!-- Delta T badge -->
           ${data.delta_t != null
             ? html`
-                <div class="floor-system-metric delta">
-                  <span class="floor-system-metric-label">\u0394T</span>
-                  <span class="floor-system-metric-value">${data.delta_t}\u00B0</span>
-                </div>
+                <rect x="170" y="132" width="60" height="18" rx="9" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.15)" stroke-width="0.8"/>
+                <text x="200" y="145" font-size="9" text-anchor="middle" fill="rgba(255,255,255,0.7)" font-family="sans-serif" font-weight="600">ΔT ${data.delta_t}°</text>
               `
             : ''}
+
+          <!-- Flow rate (if available) -->
           ${data.flow_rate
             ? html`
-                <div class="floor-system-metric flow">
-                  <span class="floor-system-metric-label">Flow</span>
-                  <span class="floor-system-metric-value">
-                    ${data.flow_rate.value}${data.flow_rate.unit}
-                  </span>
-                </div>
+                <text x="200" y="15" font-size="8" text-anchor="middle" fill="rgba(255,255,255,0.5)" font-family="sans-serif">Flow: ${data.flow_rate.value} ${data.flow_rate.unit}</text>
               `
             : ''}
+
+          <!-- Pump status (if available) -->
           ${data.pump_entity != null
             ? html`
-                <div class="floor-system-metric pump ${data.pump_active ? 'active' : 'inactive'}">
-                  <span class="floor-system-metric-label">Pump</span>
-                  <span class="floor-system-metric-value">
-                    ${data.pump_active ? 'On' : 'Off'}
-                  </span>
-                </div>
+                <circle cx="385" cy="52" r="5" fill="${data.pump_active ? '#4caf50' : '#616161'}"/>
+                <text x="385" y="70" font-size="6" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="sans-serif">PUMP</text>
               `
             : ''}
-        </div>
-        ${data.extra?.length
-          ? html`
-              <div class="floor-system-extra">
-                ${data.extra.map(
-                  (s) => html`
-                    <span class="floor-system-extra-chip">
-                      <span class="floor-system-extra-name">${s.name}</span>
-                      <span class="floor-system-extra-value">${s.value}${s.unit}</span>
-                    </span>
-                  `
-                )}
-              </div>
-            `
-          : ''}
+        </svg>
       </div>
     `;
   }
@@ -491,10 +546,10 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           ? html`
               <div class="weather-forecast">
                 ${weather.forecast.map((f) => {
-                  const day = new Date(f.datetime).toLocaleDateString('en-US', { weekday: 'short' });
+                  const time = new Date(f.datetime).toLocaleTimeString('en-US', { hour: 'numeric', hour12: true });
                   return html`
                     <div class="forecast-day">
-                      <span class="forecast-day-name">${day}</span>
+                      <span class="forecast-day-name">${time}</span>
                       <span class="forecast-condition">${this.conditionIcon(f.condition)}</span>
                       <span class="forecast-temps">
                         <span class="forecast-hi">${f.temperature ?? '\u2014'}\u00B0</span>
@@ -509,6 +564,153 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
               </div>
             `
           : ''}
+      </div>
+    `;
+  }
+
+  private renderSunTracker(): TemplateResult | null {
+    if (this._config.show_sun_tracker === false) return null;
+    const sun = this.sunData;
+    if (!sun) return null;
+
+    const lat = (this.hass.config as { latitude?: number }).latitude as number;
+    const lng = (this.hass.config as { longitude?: number }).longitude as number;
+
+    const mapUrl = this._config.google_maps_key
+      ? `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=18&size=800x400&maptype=satellite&key=${this._config.google_maps_key}`
+      : `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/export?bbox=${lng - 0.003},${lat - 0.0015},${lng + 0.003},${lat + 0.0015}&bboxSR=4326&size=800,400&imageSR=4326&format=png&f=image`;
+
+    const arcPoints: string[] = [];
+    for (let i = 0; i <= 100; i++) {
+      const t = i / 100;
+      const x = 5 + t * 90;
+      const y = 85 - Math.sin(t * Math.PI) * 60;
+      arcPoints.push(`${x},${y}`);
+    }
+    const arcPath = `M ${arcPoints.join(' L ')}`;
+
+    const clampedProgress = Math.max(0, Math.min(1, sun.progress));
+    const sunX = 5 + clampedProgress * 90;
+    const sunY = 85 - Math.sin(clampedProgress * Math.PI) * 60;
+    const isUp = sun.state === 'above_horizon';
+
+    const fmt = (d: Date) =>
+      d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    const riseTime = fmt(sun.rising);
+    const setTime = fmt(sun.setting);
+
+    const hrs = Math.floor(sun.remaining_minutes / 60);
+    const mins = sun.remaining_minutes % 60;
+    const remaining = isUp ? `${hrs}h ${mins}m remaining` : 'Night';
+
+    const skyGradient = isUp
+      ? sun.progress < 0.15 || sun.progress > 0.85
+        ? 'url(#skyDawn)'
+        : 'url(#skyDay)'
+      : 'url(#skyNight)';
+
+    return html`
+      <div class="sun-tracker">
+        <div class="sun-tracker-bg" style="background-image: url('${mapUrl}')">
+          <svg class="sun-tracker-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id="skyDay" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="rgba(25,118,210,0.5)" />
+                <stop offset="100%" stop-color="rgba(25,118,210,0.05)" />
+              </linearGradient>
+              <linearGradient id="skyDawn" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="rgba(66,66,120,0.6)" />
+                <stop offset="50%" stop-color="rgba(255,138,80,0.3)" />
+                <stop offset="100%" stop-color="rgba(255,183,77,0.1)" />
+              </linearGradient>
+              <linearGradient id="skyNight" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="rgba(20,20,60,0.8)" />
+                <stop offset="100%" stop-color="rgba(30,30,80,0.3)" />
+              </linearGradient>
+              <radialGradient id="sunGlow">
+                <stop offset="0%" stop-color="rgba(255,235,59,0.9)" />
+                <stop offset="50%" stop-color="rgba(255,193,7,0.4)" />
+                <stop offset="100%" stop-color="rgba(255,193,7,0)" />
+              </radialGradient>
+              <linearGradient id="arcGrad" x1="0" y1="0" x2="1" y2="0">
+                <stop offset="0%" stop-color="rgba(255,183,77,0.6)" />
+                <stop offset="50%" stop-color="rgba(255,235,59,0.8)" />
+                <stop offset="100%" stop-color="rgba(255,138,80,0.6)" />
+              </linearGradient>
+            </defs>
+
+            <rect x="0" y="0" width="100" height="100" fill="${skyGradient}" />
+
+            <line
+              x1="0"
+              y1="85"
+              x2="100"
+              y2="85"
+              stroke="rgba(255,255,255,0.25)"
+              stroke-width="0.3"
+              stroke-dasharray="1,1"
+            />
+
+            <path
+              d="${arcPath}"
+              fill="none"
+              stroke="rgba(255,235,59,0.2)"
+              stroke-width="0.3"
+              stroke-dasharray="1,0.5"
+            />
+
+            ${isUp
+              ? html`
+                  <path
+                    d="M ${arcPoints.slice(0, Math.round(clampedProgress * 100) + 1).join(' L ')}"
+                    fill="none"
+                    stroke="url(#arcGrad)"
+                    stroke-width="0.5"
+                  />
+                `
+              : ''}
+
+            ${isUp
+              ? html`
+                  <circle cx="${sunX}" cy="${sunY}" r="6" fill="url(#sunGlow)" />
+                  <circle
+                    cx="${sunX}"
+                    cy="${sunY}"
+                    r="1.8"
+                    fill="#FFD54F"
+                    stroke="#FFF176"
+                    stroke-width="0.3"
+                  />
+                `
+              : html`
+                  <circle
+                    cx="50"
+                    cy="40"
+                    r="2"
+                    fill="rgba(200,200,220,0.8)"
+                    stroke="rgba(255,255,255,0.3)"
+                    stroke-width="0.2"
+                  />
+                `}
+          </svg>
+
+          <div class="sun-tracker-labels">
+            <div class="sun-rise-label">
+              <span class="sun-label-icon">↗</span>
+              <span class="sun-label-time">${riseTime}</span>
+              <span class="sun-label-text">Sunrise</span>
+            </div>
+            <div class="sun-info-center">
+              <span class="sun-elevation">${Math.round(sun.elevation)}°</span>
+              <span class="sun-remaining">${remaining}</span>
+            </div>
+            <div class="sun-set-label">
+              <span class="sun-label-icon">↘</span>
+              <span class="sun-label-time">${setTime}</span>
+              <span class="sun-label-text">Sunset</span>
+            </div>
+          </div>
+        </div>
       </div>
     `;
   }
@@ -1067,6 +1269,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                 ${this.renderWeatherStrip()}
                 ${this.renderFloorSystem()}
               </div>
+              ${this.renderSunTracker()}
               ${this.renderFloorPlan()}
             `
           : html`
@@ -1079,6 +1282,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                 ${this.renderWeatherStrip()}
                 ${this.renderFloorSystem()}
               </div>
+              ${this.renderSunTracker()}
               ${sections.length
                 ? sections.map((s) => this.renderFloorSection(s))
                 : html`<div class="empty">No climate zones found. Check your configuration.</div>`}

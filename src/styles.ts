@@ -124,7 +124,7 @@ export const styles: CSSResultGroup = css`
 
   .weather-forecast {
     display: flex;
-    gap: 2px;
+    gap: 0;
     width: 100%;
     margin-top: 10px;
     padding-top: 10px;
@@ -137,7 +137,7 @@ export const styles: CSSResultGroup = css`
     flex-direction: column;
     align-items: center;
     gap: 2px;
-    min-width: 48px;
+    min-width: 40px;
   }
 
   .forecast-day-name {
@@ -182,6 +182,18 @@ export const styles: CSSResultGroup = css`
     background: linear-gradient(135deg, rgba(255, 152, 0, 0.12), rgba(255, 112, 67, 0.08));
     border: 1px solid rgba(255, 152, 0, 0.2);
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  }
+
+  .floor-system.tankless-visual {
+    padding: 8px;
+    background: linear-gradient(135deg, rgba(40, 40, 60, 0.95), rgba(30, 30, 50, 0.9));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .tankless-svg {
+    width: 100%;
+    height: auto;
+    display: block;
   }
 
   .floor-system-header {
@@ -1219,6 +1231,88 @@ export const styles: CSSResultGroup = css`
     border-color: #ff9800;
   }
 
+  /* ── Sun Tracker ── */
+  .sun-tracker {
+    margin-bottom: 18px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  }
+
+  .sun-tracker-bg {
+    position: relative;
+    width: 100%;
+    height: 200px;
+    background-size: cover;
+    background-position: center;
+    background-color: #1a1a2e;
+  }
+
+  .sun-tracker-svg {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+  }
+
+  .sun-tracker-labels {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    padding: 12px 16px;
+    background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  }
+
+  .sun-rise-label,
+  .sun-set-label {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+  }
+
+  .sun-label-icon {
+    font-size: 1rem;
+    color: #ffb74d;
+  }
+
+  .sun-label-time {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: white;
+  }
+
+  .sun-label-text {
+    font-size: 0.6rem;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .sun-info-center {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .sun-elevation {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: white;
+  }
+
+  .sun-remaining {
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+
   @media (max-width: 600px) {
     .weather-strip {
       flex-direction: column;
@@ -1247,6 +1341,10 @@ export const styles: CSSResultGroup = css`
 
     .fp-summary {
       flex-direction: column;
+    }
+
+    .sun-tracker-bg {
+      height: 160px;
     }
   }
 `;

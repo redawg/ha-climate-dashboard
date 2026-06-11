@@ -60,6 +60,10 @@ export interface ClimateCommandCenterConfig {
   floor_plan?: FloorPlanConfig;
   /** Floor heating system config (supply/return temps, flow, etc.) */
   floor_system?: FloorSystemConfig;
+  /** Google Maps Static API key for sun tracker background (optional, uses ESRI satellite if omitted) */
+  google_maps_key?: string;
+  /** Show sun tracker card */
+  show_sun_tracker?: boolean;
 }
 
 export interface ZoneSensors {
@@ -212,4 +216,16 @@ export interface FloorSystemData {
   pump_active?: boolean;
   pump_entity?: string;
   extra?: Array<{ entity_id: string; name: string; value: number; unit: string }>;
+}
+
+export interface SunData {
+  state: 'above_horizon' | 'below_horizon';
+  elevation: number;
+  azimuth: number;
+  rising: Date;
+  setting: Date;
+  /** 0 = sunrise, 0.5 = solar noon, 1 = sunset. <0 or >1 means night */
+  progress: number;
+  daylight_minutes: number;
+  remaining_minutes: number;
 }
