@@ -1977,7 +1977,7 @@ function e(e,t,r,s){var o,n=arguments.length,i=n<3?t:null===s?s=Object.getOwnPro
           <text x="358" y="${188}" font-size="7" text-anchor="middle" fill="rgba(255,255,255,0.45)" font-family="sans-serif" font-weight="600">COLD INPUT</text>
 
           <!-- Stats row below pipes -->
-          ${(()=>{const t=[];if(e.flow_rate&&t.push({label:"FLOW",value:`${e.flow_rate.value} ${e.flow_rate.unit}`,color:"#64b5f6"}),null!=e.delta_t&&t.push({label:"ΔT",value:`${e.delta_t}°`,color:"rgba(255,255,255,0.7)"}),e.power&&t.push({label:"POWER",value:`${e.power.value} ${e.power.unit}`,color:"#ffb74d"}),!t.length)return"";const r=400/(t.length+1);return t.map((e,t)=>{const s=r*(t+1);return L`
+          ${(()=>{const t=[];if(e.flow_rate&&t.push({label:"FLOW",value:`${e.flow_rate.value} ${e.flow_rate.unit}`,color:"#64b5f6"}),null!=e.delta_t&&t.push({label:"ΔT",value:`${e.delta_t}°`,color:"rgba(255,255,255,0.7)"}),e.power){const r="kW"===e.power.unit?e.power.value:e.power.value/1e3,s=r>=1?1:r>=.01?2:3,o=String(parseFloat(r.toFixed(s)));t.push({label:"kW",value:o,color:"#ffb74d"})}if(!t.length)return"";const r=400/(t.length+1);return t.map((e,t)=>{const s=r*(t+1);return L`
                 <rect x="${s-36}" y="${194}" width="72" height="20" rx="10" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.12)" stroke-width="0.6"/>
                 <text x="${s}" y="${204}" font-size="8" text-anchor="middle" fill="${e.color}" font-family="sans-serif" font-weight="700">${e.value}</text>
                 <text x="${s}" y="${211}" font-size="5" text-anchor="middle" fill="rgba(255,255,255,0.4)" font-family="sans-serif" font-weight="600">${e.label}</text>

@@ -874,7 +874,13 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
             const stats: Array<{ label: string; value: string; color: string }> = [];
             if (data.flow_rate) stats.push({ label: 'FLOW', value: `${data.flow_rate.value} ${data.flow_rate.unit}`, color: '#64b5f6' });
             if (data.delta_t != null) stats.push({ label: 'ΔT', value: `${data.delta_t}°`, color: 'rgba(255,255,255,0.7)' });
-            if (data.power) stats.push({ label: 'POWER', value: `${data.power.value} ${data.power.unit}`, color: '#ffb74d' });
+            if (data.power) {
+              const kw =
+                data.power.unit === 'kW' ? data.power.value : data.power.value / 1000;
+              const decimals = kw >= 1 ? 1 : kw >= 0.01 ? 2 : 3;
+              const kwStr = String(parseFloat(kw.toFixed(decimals)));
+              stats.push({ label: 'kW', value: kwStr, color: '#ffb74d' });
+            }
             if (!stats.length) return '';
             const spacing = 400 / (stats.length + 1);
             return stats.map((s, i) => {
