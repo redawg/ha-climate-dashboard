@@ -29,6 +29,7 @@ import {
 } from './utils/entity-resolver';
 import { computeZoneHeightStats } from './utils/height-averages';
 import { FLOORPLAN_IMAGE } from './floorplan-image';
+import { DEFAULT_HEATER_IMAGE } from './heater-image';
 
 declare global {
   interface Window {
@@ -694,8 +695,8 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     const inletUnit = data.return_temp?.unit ?? '°';
     const outletUnit = data.supply_temp?.unit ?? '°';
     const fs = this._config.floor_system;
-    const heaterImage =
-      fs !== false && fs?.heater_image?.trim() ? fs.heater_image.trim() : undefined;
+    const customImage = fs !== false && fs?.heater_image?.trim() ? fs.heater_image.trim() : undefined;
+    const heaterImage = customImage ?? DEFAULT_HEATER_IMAGE;
 
     const heaterX = 100;
     const heaterY = 38;
@@ -777,54 +778,26 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <!-- Unit shadow -->
           <ellipse cx="200" cy="${heaterBottom + 3}" rx="92" ry="4" fill="rgba(0,0,0,0.28)"/>
 
-          <!-- Heater unit -->
-          ${heaterImage
-            ? html`
-                <image
-                  href="${heaterImage}"
-                  x="${heaterX}"
-                  y="${heaterY}"
-                  width="${heaterW}"
-                  height="${heaterH}"
-                  clip-path="url(#heaterClip)"
-                  preserveAspectRatio="xMidYMid meet"
-                />
-                <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"
-                  fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="1"/>
-              `
-            : ''}
-          <!-- Body: main panel -->
-          ${!heaterImage ? html`
-            <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"
-              fill="#e8e8e8" stroke="#b0b0b0" stroke-width="1"/>
-            <!-- Top highlight -->
-            <rect x="${heaterX + 1}" y="${heaterY + 1}" width="${heaterW - 2}" height="28" rx="7"
-              fill="rgba(255,255,255,0.35)"/>
-            <!-- Bottom shadow -->
-            <rect x="${heaterX + 1}" y="${heaterY + heaterH - 18}" width="${heaterW - 2}" height="17" rx="7"
-              fill="rgba(0,0,0,0.06)"/>
-            <!-- Heat glow when active -->
-            ${data.pump_active ? html`
-              <rect x="${heaterX + 10}" y="${heaterY + 28}" width="${heaterW - 20}" height="${heaterH - 42}" rx="6"
-                fill="rgba(255,120,50,0.18)"/>
-            ` : ''}
-          ` : ''}
-          <!-- Display circle (always shown) -->
-          <circle cx="265" cy="58" r="16" fill="#1a1a2e" stroke="#aaa" stroke-width="1.2"/>
-          <circle cx="265" cy="58" r="13" fill="#0a0a1a" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/>
-          <text x="265" y="${data.set_temp != null ? '56' : '61'}" font-size="10" text-anchor="middle"
+          <!-- Heater unit image -->
+          <image
+            href="${heaterImage}"
+            x="${heaterX}"
+            y="${heaterY}"
+            width="${heaterW}"
+            height="${heaterH}"
+            clip-path="url(#heaterClip)"
+            preserveAspectRatio="xMidYMid meet"
+          />
+          <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"
+            fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="0.8"/>
+          <!-- Set temp overlay on the display area -->
+          <circle cx="${heaterX + heaterW * 0.68}" cy="${heaterY + heaterH * 0.25}" r="14" fill="rgba(0,0,0,0.55)"/>
+          <text x="${heaterX + heaterW * 0.68}" y="${data.set_temp != null ? `${heaterY + heaterH * 0.23}` : `${heaterY + heaterH * 0.28}`}" font-size="10" text-anchor="middle"
             fill="#ffb74d" font-family="sans-serif" font-weight="700"
           >${data.set_temp != null ? `${data.set_temp}°` : outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
           ${data.set_temp != null ? html`
-            <text x="265" y="66" font-size="5.5" text-anchor="middle" fill="rgba(255,255,255,0.45)"
+            <text x="${heaterX + heaterW * 0.68}" y="${heaterY + heaterH * 0.33}" font-size="5" text-anchor="middle" fill="rgba(255,255,255,0.5)"
               font-family="sans-serif" font-weight="600">SET</text>
-          ` : ''}
-          <!-- Unit label -->
-          ${!heaterImage ? html`
-            <text x="185" y="90" font-size="7" text-anchor="middle" fill="rgba(80,80,80,0.5)"
-              font-family="sans-serif" font-weight="600" letter-spacing="0.6">TANKLESS</text>
-            <text x="185" y="100" font-size="5.5" text-anchor="middle" fill="rgba(80,80,80,0.35)"
-              font-family="sans-serif" letter-spacing="0.4">WATER HEATER</text>
           ` : ''}
 
           <!-- Copper connection stubs at bottom of heater -->
