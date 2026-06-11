@@ -817,13 +817,13 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           />
           <rect x="${heaterX}" y="${heaterY}" width="${heaterW}" height="${heaterH}" rx="8"
             fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="0.8"/>
-          <!-- Set temp overlay on the display area -->
-          <circle cx="${heaterX + heaterW * 0.68}" cy="${heaterY + heaterH * 0.25}" r="14" fill="rgba(0,0,0,0.55)"/>
-          <text x="${heaterX + heaterW * 0.68}" y="${data.set_temp != null ? `${heaterY + heaterH * 0.23}` : `${heaterY + heaterH * 0.28}`}" font-size="10" text-anchor="middle"
-            fill="#ffb74d" font-family="sans-serif" font-weight="700"
+          <!-- Set temp overlay aligned with display circle on heater photo -->
+          <text x="${heaterX + heaterW * 0.63}" y="${data.set_temp != null ? `${heaterY + heaterH * 0.23}` : `${heaterY + heaterH * 0.27}`}" font-size="11" text-anchor="middle"
+            fill="${data.pump_active ? '#4caf50' : '#1a1a1a'}" font-family="sans-serif" font-weight="700"
           >${data.set_temp != null ? `${data.set_temp}°` : outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
           ${data.set_temp != null ? html`
-            <text x="${heaterX + heaterW * 0.68}" y="${heaterY + heaterH * 0.33}" font-size="5" text-anchor="middle" fill="rgba(255,255,255,0.5)"
+            <text x="${heaterX + heaterW * 0.63}" y="${heaterY + heaterH * 0.31}" font-size="5" text-anchor="middle"
+              fill="${data.pump_active ? 'rgba(76,175,80,0.6)' : 'rgba(0,0,0,0.4)'}"
               font-family="sans-serif" font-weight="600">SET</text>
           ` : ''}
 
