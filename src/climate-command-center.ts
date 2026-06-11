@@ -60,6 +60,35 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
 
   private _forecastUnsub?: () => void;
 
+  private static readonly STORAGE_KEY = 'climate-command-center-config';
+
+  private _persistConfig(config: ClimateCommandCenterConfig): void {
+    fireEvent(this, 'config-changed', { config });
+    try {
+      const persisted: Record<string, unknown> = {};
+      const keys: (keyof ClimateCommandCenterConfig)[] = [
+        'zone_kinds', 'zone_floors', 'sensor_map', 'exclude_entities',
+        'sensor_heights', 'zone_heights', 'floor_system', 'floor_plan',
+      ];
+      for (const k of keys) {
+        if (config[k] !== undefined) persisted[k] = config[k];
+      }
+      localStorage.setItem(
+        ClimateCommandCenterCard.STORAGE_KEY,
+        JSON.stringify(persisted),
+      );
+    } catch { /* localStorage unavailable */ }
+  }
+
+  private static _loadPersistedOverrides(): Partial<ClimateCommandCenterConfig> {
+    try {
+      const raw = localStorage.getItem(ClimateCommandCenterCard.STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }
+
   static get styles(): CSSResultGroup {
     return styles;
   }
@@ -105,6 +134,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     if (!config.zones?.length && !config.auto_discover) {
       throw new Error('Configure zones or enable auto_discover');
     }
+    const saved = ClimateCommandCenterCard._loadPersistedOverrides();
     this._config = {
       title: 'Climate Command Center',
       auto_discover: true,
@@ -113,7 +143,13 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       group_by_floor: true,
       allow_sensor_reassign: true,
       reference_height_ft: 5,
+      ...saved,
       ...config,
+      zone_kinds: { ...(saved.zone_kinds ?? {}), ...(config.zone_kinds ?? {}) },
+      zone_floors: { ...(saved.zone_floors ?? {}), ...(config.zone_floors ?? {}) },
+      sensor_map: { ...(saved.sensor_map ?? {}), ...(config.sensor_map ?? {}) },
+      sensor_heights: { ...(saved.sensor_heights ?? {}), ...(config.sensor_heights ?? {}) },
+      zone_heights: { ...(saved.zone_heights ?? {}), ...(config.zone_heights ?? {}) },
       floors: config.floors?.length ? config.floors : DEFAULT_FLOORS,
     };
     this._floorSystemEntityIds = undefined;
@@ -265,7 +301,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     }
     const next = { ...this._config, zone_floors };
     this._config = next;
-    fireEvent(this, 'config-changed', { config: next });
+    this._persistConfig(next);
   }
 
   private updateZoneKind(climateEntity: string, kind: 'floor_heat' | 'thermostat'): void {
@@ -273,7 +309,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     zone_kinds[climateEntity] = kind;
     const next = { ...this._config, zone_kinds };
     this._config = next;
-    fireEvent(this, 'config-changed', { config: next });
+    this._persistConfig(next);
   }
 
   private toggleSetupMode(): void {
@@ -294,7 +330,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           ? { ...this._config, floor_system: false as const }
           : { ...this._config, floor_system: undefined };
       this._config = next;
-      fireEvent(this, 'config-changed', { config: next });
+      this._persistConfig(next);
       return;
     }
 
@@ -322,7 +358,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       floor_system: hasExplicit ? current : undefined,
     };
     this._config = next;
-    fireEvent(this, 'config-changed', { config: next });
+    this._persistConfig(next);
   }
 
   private floorSystemEntityOptions(
@@ -532,7 +568,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       exclude_entities: [...exclude],
     };
     this._config = next;
-    fireEvent(this, 'config-changed', { config: next });
+    this._persistConfig(next);
   }
 
   private updateSensorHeight(entityId: string, raw: string): void {
@@ -547,7 +583,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     }
     const next = { ...this._config, sensor_heights };
     this._config = next;
-    fireEvent(this, 'config-changed', { config: next });
+    this._persistConfig(next);
   }
 
   private updateZoneHeight(climateEntity: string, raw: string): void {
@@ -562,7 +598,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     }
     const next = { ...this._config, zone_heights };
     this._config = next;
-    fireEvent(this, 'config-changed', { config: next });
+    this._persistConfig(next);
   }
 
   private renderHeightEditor(entityId: string, height?: number): TemplateResult | null {
@@ -1512,7 +1548,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       floor_plan: { ...this._config.floor_plan, thermostats: existing },
     };
     this._config = newConfig;
-    fireEvent(this, 'config-changed', { config: newConfig });
+    this._persistConfig(newConfig);
     this._placingThermostat = null;
   }
 
@@ -1524,7 +1560,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       floor_plan: { ...this._config.floor_plan, thermostats },
     };
     this._config = newConfig;
-    fireEvent(this, 'config-changed', { config: newConfig });
+    this._persistConfig(newConfig);
   }
 
   private updateFpThermostat(idx: number, field: string, value: string): void {
@@ -1536,7 +1572,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       floor_plan: { ...this._config.floor_plan, thermostats },
     };
     this._config = newConfig;
-    fireEvent(this, 'config-changed', { config: newConfig });
+    this._persistConfig(newConfig);
   }
 
   private renderFloorPlan(): TemplateResult {
