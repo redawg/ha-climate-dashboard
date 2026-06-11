@@ -1932,11 +1932,11 @@ function e(e,t,r,s){var o,n=arguments.length,i=n<3?t:null===s?s=Object.getOwnPro
           <rect x="${p}" y="${u}" width="${c}" height="${d}" rx="8"
             fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="0.8"/>
           <!-- Set temp overlay aligned with display circle on heater photo -->
-          ${(()=>{const t="heating"===e.heater_state||"heat"===e.heater_state,s=t?"#4caf50":"#1a1a1a",o=t?"rgba(76,175,80,0.7)":"rgba(0,0,0,0.45)";return G`
-              <text x="${220.4}" y="${null!=e.set_temp?"43.28":"48.72"}" font-size="12" text-anchor="middle"
+          ${(()=>{const t="heating"===e.heater_state||"heat"===e.heater_state,s=t?"#8b0000":"#1a1a1a",o=t?"rgba(139,0,0,0.7)":"rgba(0,0,0,0.45)";return L`
+              <text x="${220.4}" y="${null!=e.set_temp?43.28:48.72}" font-size="12" text-anchor="middle"
                 fill="${s}" font-family="sans-serif" font-weight="800"
               >${null!=e.set_temp?`${e.set_temp}°`:null!=r?`${r}${i}`:"—"}</text>
-              ${null!=e.set_temp?G`
+              ${null!=e.set_temp?L`
                 <text x="${220.4}" y="${54.16}" font-size="5.5" text-anchor="middle"
                   fill="${o}" font-family="sans-serif" font-weight="700">SET</text>
               `:""}

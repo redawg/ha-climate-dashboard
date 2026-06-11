@@ -871,14 +871,14 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           <!-- Set temp overlay aligned with display circle on heater photo -->
           ${(() => {
             const heating = data.heater_state === 'heating' || data.heater_state === 'heat';
-            const tempColor = heating ? '#4caf50' : '#1a1a1a';
-            const subColor = heating ? 'rgba(76,175,80,0.7)' : 'rgba(0,0,0,0.45)';
+            const tempColor = heating ? '#8b0000' : '#1a1a1a';
+            const subColor = heating ? 'rgba(139,0,0,0.7)' : 'rgba(0,0,0,0.45)';
             const cx = heaterX + heaterW * 0.65;
-            return html`
-              <text x="${cx}" y="${data.set_temp != null ? `${heaterY + heaterH * 0.23}` : `${heaterY + heaterH * 0.27}`}" font-size="12" text-anchor="middle"
+            return svg`
+              <text x="${cx}" y="${data.set_temp != null ? heaterY + heaterH * 0.23 : heaterY + heaterH * 0.27}" font-size="12" text-anchor="middle"
                 fill="${tempColor}" font-family="sans-serif" font-weight="800"
               >${data.set_temp != null ? `${data.set_temp}°` : outletTemp != null ? `${outletTemp}${outletUnit}` : '—'}</text>
-              ${data.set_temp != null ? html`
+              ${data.set_temp != null ? svg`
                 <text x="${cx}" y="${heaterY + heaterH * 0.31}" font-size="5.5" text-anchor="middle"
                   fill="${subColor}" font-family="sans-serif" font-weight="700">SET</text>
               ` : ''}
