@@ -6,6 +6,7 @@ import {
   AreaSensor,
   ClimateCommandCenterConfig,
   ClimateZone,
+  ForecastEntry,
   FloorPlanThermostat,
   FloorSection,
   FloorSystemData,
@@ -45,6 +46,9 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   @state() private _setupMode = false;
   @state() private _view: 'cards' | 'floorplan' = 'cards';
   @state() private _placingThermostat: 'wall' | 'floor' | null = null;
+  @state() private _forecast: ForecastEntry[] | null = null;
+
+  private _forecastUnsub?: () => void;
 
   static get styles(): CSSResultGroup {
     return styles;
@@ -71,13 +75,71 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     return 6;
   }
 
+  public connectedCallback(): void {
+    super.connectedCallback();
+    this._subscribeForecast();
+  }
+
+  public disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this._unsubscribeForecast();
+  }
+
+  protected updated(changedProps: Map<string, unknown>): void {
+    if (changedProps.has('hass') && !this._forecastUnsub) {
+      this._subscribeForecast();
+    }
+  }
+
+  private async _subscribeForecast(): Promise<void> {
+    this._unsubscribeForecast();
+    if (!this.hass) return;
+    const weatherEntityId =
+      this._config.weather_entity ??
+      Object.keys(this.hass.states).find(
+        (eid) => eid.startsWith('weather.') && (eid.includes('weatherflow') || eid.includes('tempest'))
+      ) ??
+      Object.keys(this.hass.states).find((eid) => eid.startsWith('weather.'));
+    if (!weatherEntityId) return;
+    try {
+      this._forecastUnsub = await (this.hass.connection as { subscribeMessage: (
+        callback: (msg: { forecast?: ForecastEntry[] }) => void,
+        subscribeMessage: { type: string; forecast_type: string; entity_id: string }
+      ) => Promise<() => void> }).subscribeMessage(
+        (msg) => {
+          if (msg.forecast) {
+            this._forecast = msg.forecast.slice(0, 5);
+          }
+        },
+        {
+          type: 'weather/subscribe_forecast',
+          forecast_type: 'daily',
+          entity_id: weatherEntityId,
+        }
+      );
+    } catch {
+      // Fallback: forecast from entity attributes (handled in getWeatherData)
+    }
+  }
+
+  private _unsubscribeForecast(): void {
+    if (this._forecastUnsub) {
+      this._forecastUnsub();
+      this._forecastUnsub = undefined;
+    }
+  }
+
   private get sections(): FloorSection[] {
     return buildFloorSections(this.hass, this._config);
   }
 
   private get weather(): WeatherData | null {
     if (!this._config.show_weather) return null;
-    return getWeatherData(this.hass, this._config);
+    const data = getWeatherData(this.hass, this._config);
+    if (data && this._forecast?.length && !data.forecast?.length) {
+      data.forecast = this._forecast;
+    }
+    return data;
   }
 
   private get floorSystem(): FloorSystemData | null {
@@ -409,7 +471,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     return html`
       <div class="weather-strip">
         <div class="weather-main">
-          <span class="weather-icon">\uD83C\uDF24</span>
+          <span class="weather-icon">${this.conditionIcon(weather.condition)}</span>
           <div>
             <div class="weather-temp">${weather.temperature ?? '\u2014'}\u00B0</div>
             <div class="weather-label">${weather.label}</div>
@@ -419,6 +481,11 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
           ${weather.humidity != null ? html`<span>\uD83D\uDCA7 ${Math.round(weather.humidity)}%</span>` : ''}
           ${weather.feels_like != null ? html`<span>Feels ${Math.round(weather.feels_like)}\u00B0</span>` : ''}
           ${weather.dew_point != null ? html`<span>Dew ${Math.round(weather.dew_point)}\u00B0</span>` : ''}
+          ${weather.wind_speed != null
+            ? html`<span>\uD83D\uDCA8 ${Math.round(weather.wind_speed)}${weather.wind_gust ? ` (${Math.round(weather.wind_gust)})` : ''} mph</span>`
+            : ''}
+          ${weather.pressure != null ? html`<span>\uD83D\uDCCA ${Math.round(weather.pressure)} mb</span>` : ''}
+          ${weather.uv_index != null ? html`<span>\u2600\uFE0F UV ${weather.uv_index}</span>` : ''}
         </div>
         ${weather.forecast?.length
           ? html`
@@ -433,6 +500,9 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
                         <span class="forecast-hi">${f.temperature ?? '\u2014'}\u00B0</span>
                         <span class="forecast-lo">${f.templow ?? ''}${f.templow != null ? '\u00B0' : ''}</span>
                       </span>
+                      ${f.precipitation_probability != null
+                        ? html`<span class="forecast-precip">\uD83D\uDCA7${f.precipitation_probability}%</span>`
+                        : ''}
                     </div>
                   `;
                 })}

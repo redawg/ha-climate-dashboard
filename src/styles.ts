@@ -169,6 +169,12 @@ export const styles: CSSResultGroup = css`
     opacity: 0.7;
   }
 
+  .forecast-precip {
+    font-size: 0.6rem;
+    color: #64b5f6;
+    opacity: 0.85;
+  }
+
   .floor-system {
     padding: 14px 18px;
     margin-bottom: 18px;

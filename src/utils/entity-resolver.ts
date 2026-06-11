@@ -913,69 +913,98 @@ export function getWeatherData(
   hass: HomeAssistant,
   config: ClimateCommandCenterConfig
 ): WeatherData | null {
-  const findWeatherSensor = (pattern: string, deviceClass: 'temperature' | 'humidity' = 'temperature'): string | undefined =>
+  // 1. Find the weather entity (prefer weatherflow)
+  const weatherEntityId =
+    config.weather_entity ??
+    Object.keys(hass.states).find(
+      (eid) => eid.startsWith('weather.') && (eid.includes('weatherflow') || eid.includes('tempest'))
+    ) ??
+    Object.keys(hass.states).find((eid) => eid.startsWith('weather.'));
+
+  const weatherState = weatherEntityId ? getEntity(hass, weatherEntityId) : null;
+  const wAttr = weatherState?.attributes ?? {};
+
+  // 2. Helper to find WeatherFlow/Tempest sensors
+  const findSensor = (
+    patterns: string[],
+    deviceClass?: string,
+    excludePatterns: string[] = []
+  ): string | undefined =>
     Object.values(hass.states).find((e) => {
+      if (!e.entity_id.startsWith('sensor.')) return false;
       const name = normalize(friendlyName(e as HassEntity));
-      return (
-        e.entity_id.startsWith('sensor.') &&
-        e.attributes.device_class === deviceClass &&
-        (name.includes('weather') || name.includes('tempest')) &&
-        name.includes(normalize(pattern))
-      );
+      const eid = normalize(e.entity_id);
+      const haystack = `${eid} ${name}`;
+      if (deviceClass && e.attributes.device_class !== deviceClass) return false;
+      const hasWeather =
+        haystack.includes('weather') ||
+        haystack.includes('tempest') ||
+        haystack.includes('weatherflow');
+      if (!hasWeather) return false;
+      const matchesPattern = patterns.some((p) => haystack.includes(normalize(p)));
+      const excluded = excludePatterns.some((p) => haystack.includes(normalize(p)));
+      return matchesPattern && !excluded;
     })?.entity_id;
 
-  const tempEntity = getEntity(
-    hass,
-    config.weather_temperature ??
-      findWeatherSensor('temperature') ??
-      Object.values(hass.states).find((e) => {
-        const name = normalize(friendlyName(e as HassEntity));
-        return (
-          e.entity_id.startsWith('sensor.') &&
-          e.attributes.device_class === 'temperature' &&
-          name.includes('weather station') &&
-          name.includes('temperature') &&
-          !name.includes('wet bulb') &&
-          !name.includes('dew') &&
-          !name.includes('feels')
-        );
-      })?.entity_id
-  );
+  // 3. Resolve temperature - weather entity attr first, then sensor discovery
+  const temperature =
+    (wAttr.temperature as number | undefined) ??
+    parseNumber(
+      getEntity(
+        hass,
+        config.weather_temperature ??
+          findSensor(['temperature'], 'temperature', ['wet bulb', 'dew', 'feels', 'heat index', 'wind chill'])
+      )
+    );
 
-  if (!tempEntity) return null;
+  if (temperature == null && !weatherState) return null;
 
-  const label = friendlyName(tempEntity).replace(/\s+(Temperature|Temp)$/i, '') || 'Outside';
+  // 4. Build the label
+  const label = weatherState
+    ? (friendlyName(weatherState).replace(/\s*(Weather|Forecast|Cloud)$/i, '') || 'Weather')
+    : 'Outside';
 
+  // 5. Build result with all available data
   const result: WeatherData = {
     label,
-    temperature: parseNumber(tempEntity),
-    humidity: parseNumber(getEntity(hass, config.weather_humidity ?? findWeatherSensor('humidity', 'humidity'))),
+    temperature,
+    condition: weatherState?.state,
+    humidity:
+      (wAttr.humidity as number | undefined) ??
+      parseNumber(
+        getEntity(hass, config.weather_humidity ?? findSensor(['humidity'], 'humidity'))
+      ),
     feels_like: parseNumber(
       getEntity(
         hass,
         config.weather_feels_like ??
-          Object.values(hass.states).find((e) =>
-            normalize(friendlyName(e as HassEntity)).includes('feels like')
-          )?.entity_id
+          findSensor(['feels like', 'apparent'], 'temperature')
       )
     ),
     dew_point: parseNumber(
       getEntity(
         hass,
-        config.weather_dew_point ??
-          Object.values(hass.states).find((e) =>
-            normalize(friendlyName(e as HassEntity)).includes('dew point')
-          )?.entity_id
+        config.weather_dew_point ?? findSensor(['dew point'], 'temperature')
       )
+    ),
+    wind_speed:
+      (wAttr.wind_speed as number | undefined) ??
+      parseNumber(getEntity(hass, findSensor(['wind speed', 'wind avg'], undefined))),
+    wind_bearing: wAttr.wind_bearing as number | undefined,
+    wind_gust: parseNumber(getEntity(hass, findSensor(['wind gust', 'gust'], undefined))),
+    pressure:
+      (wAttr.pressure as number | undefined) ??
+      parseNumber(getEntity(hass, findSensor(['pressure', 'barometric'], 'pressure'))),
+    uv_index: parseNumber(getEntity(hass, findSensor(['uv', 'ultraviolet'], undefined, ['solar']))),
+    visibility: wAttr.visibility as number | undefined,
+    precipitation: parseNumber(
+      getEntity(hass, findSensor(['precipitation', 'rain'], undefined, ['probability', 'lightning']))
     ),
   };
 
-  const weatherEntityId =
-    config.weather_entity ??
-    Object.keys(hass.states).find((eid) => eid.startsWith('weather.'));
-  if (weatherEntityId) {
-    const weatherState = getEntity(hass, weatherEntityId);
-    const rawForecast = weatherState?.attributes.forecast as ForecastEntry[] | undefined;
+  // 6. Forecast from weather entity
+  if (weatherEntityId && weatherState) {
+    const rawForecast = wAttr.forecast as ForecastEntry[] | undefined;
     if (rawForecast?.length) {
       result.forecast = rawForecast.slice(0, 5);
     }

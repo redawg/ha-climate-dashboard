@@ -108,6 +108,8 @@ export interface ForecastEntry {
   templow?: number;
   condition?: string;
   precipitation_probability?: number;
+  precipitation?: number;
+  wind_speed?: number;
 }
 
 export interface WeatherData {
@@ -116,6 +118,14 @@ export interface WeatherData {
   humidity?: number;
   feels_like?: number;
   dew_point?: number;
+  condition?: string;
+  wind_speed?: number;
+  wind_bearing?: number;
+  wind_gust?: number;
+  pressure?: number;
+  uv_index?: number;
+  visibility?: number;
+  precipitation?: number;
   forecast?: ForecastEntry[];
 }
 
