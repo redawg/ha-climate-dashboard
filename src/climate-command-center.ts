@@ -32,6 +32,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
   @property({ attribute: false }) private _config!: ClimateCommandCenterConfig;
   @state() private _expandedZone: string | null = null;
   @state() private _editSensors = false;
+  @state() private _setupMode = false;
   @state() private _view: 'cards' | 'floorplan' = 'floorplan';
   @state() private _placingThermostat: 'wall' | 'floor' | null = null;
 
@@ -119,6 +120,14 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
       zone_floors[climateEntity] = floorName;
     }
     const next = { ...this._config, zone_floors };
+    this._config = next;
+    fireEvent(this, 'config-changed', { config: next });
+  }
+
+  private updateZoneKind(climateEntity: string, kind: 'floor_heat' | 'thermostat'): void {
+    const zone_kinds = { ...(this._config.zone_kinds ?? {}) };
+    zone_kinds[climateEntity] = kind;
+    const next = { ...this._config, zone_kinds };
     this._config = next;
     fireEvent(this, 'config-changed', { config: next });
   }
@@ -366,6 +375,26 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
     `;
   }
 
+  private renderZoneKindSetup(zone: ClimateZone): TemplateResult {
+    const current = this._config.zone_kinds?.[zone.climate_entity] ?? zone.kind;
+    const hasOverride = !!this._config.zone_kinds?.[zone.climate_entity];
+    return html`
+      <div class="zone-kind-setup" @click=${(e: Event) => e.stopPropagation()}>
+        <span class="zone-kind-setup-label">Heating type${!hasOverride ? ' (auto)' : ''}</span>
+        <div class="zone-kind-toggle">
+          <button
+            class="zone-kind-btn ${current === 'floor_heat' ? 'active floor' : ''}"
+            @click=${() => this.updateZoneKind(zone.climate_entity, 'floor_heat')}
+          >Floor Heat</button>
+          <button
+            class="zone-kind-btn ${current === 'thermostat' ? 'active hvac' : ''}"
+            @click=${() => this.updateZoneKind(zone.climate_entity, 'thermostat')}
+          >HVAC</button>
+        </div>
+      </div>
+    `;
+  }
+
   private renderZoneAreaEdit(zone: ClimateZone): TemplateResult | null {
     if (!this._editSensors) return null;
     return html`
@@ -473,6 +502,7 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
               </span>
             </div>
             ${zone.area ? html`<div class="zone-area-label">${zone.area}</div>` : ''}
+            ${this._setupMode ? this.renderZoneKindSetup(zone) : ''}
             ${this.renderZoneFloorEdit(zone)}
             ${this.renderZoneAreaEdit(zone)}
           </div>
@@ -806,7 +836,17 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
               <button class="view-btn ${!isFloorPlan ? 'active' : ''}" @click=${() => (this._view = 'cards')}>Cards</button>
               <button class="view-btn ${isFloorPlan ? 'active' : ''}" @click=${() => (this._view = 'floorplan')}>Floor Plan</button>
             </div>
-            ${!isFloorPlan && canEdit
+            ${!isFloorPlan
+              ? html`
+                  <button
+                    class="edit-sensors-btn ${this._setupMode ? 'active' : ''}"
+                    @click=${() => { this._setupMode = !this._setupMode; if (this._setupMode) this._editSensors = false; }}
+                  >
+                    ${this._setupMode ? 'Done' : 'Setup'}
+                  </button>
+                `
+              : ''}
+            ${!isFloorPlan && canEdit && !this._setupMode
               ? html`
                   <button
                     class="edit-sensors-btn ${this._editSensors ? 'active' : ''}"
@@ -825,9 +865,11 @@ export class ClimateCommandCenterCard extends LitElement implements LovelaceCard
               ${this.renderFloorPlan()}
             `
           : html`
-              ${this._editSensors
-                ? html`<div class="edit-hint">Assign sensors to HA areas or zones, set floor per zone, or hide. Save the dashboard to keep layout changes.</div>`
-                : ''}
+              ${this._setupMode
+                ? html`<div class="edit-hint">Set each zone's heating type: Floor Heat or HVAC. Save the dashboard to keep changes.</div>`
+                : this._editSensors
+                  ? html`<div class="edit-hint">Assign sensors to HA areas or zones, set floor per zone, or hide. Save the dashboard to keep layout changes.</div>`
+                  : ''}
               ${this.renderWeatherStrip()}
               ${sections.length
                 ? sections.map((s) => this.renderFloorSection(s))

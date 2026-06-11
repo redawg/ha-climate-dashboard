@@ -275,6 +275,57 @@ export const styles: CSSResultGroup = css`
     opacity: 0.85;
   }
 
+  /* ── Zone kind setup ── */
+  .zone-kind-setup {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    background: rgba(2, 136, 209, 0.06);
+    border: 1px solid rgba(2, 136, 209, 0.15);
+  }
+
+  .zone-kind-setup-label {
+    font-size: 0.68rem;
+    color: var(--secondary-text-color);
+    white-space: nowrap;
+  }
+
+  .zone-kind-toggle {
+    display: flex;
+    gap: 0;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .zone-kind-btn {
+    padding: 3px 10px;
+    font-size: 0.68rem;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+    color: var(--secondary-text-color);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .zone-kind-btn:hover {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .zone-kind-btn.active.floor {
+    background: #ff7043;
+    color: white;
+  }
+
+  .zone-kind-btn.active.hvac {
+    background: #42a5f5;
+    color: white;
+  }
+
   .zone-floor-edit,
   .zone-area-edit {
     display: flex;

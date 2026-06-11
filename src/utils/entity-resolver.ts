@@ -394,7 +394,14 @@ function resolveSensors(hass: HomeAssistant, zone: ZoneConfig): ZoneSensors {
   };
 }
 
-function zoneKind(hass: HomeAssistant, zone: ZoneConfig, sensors: ZoneSensors): 'floor_heat' | 'thermostat' {
+function zoneKind(
+  hass: HomeAssistant,
+  zone: ZoneConfig,
+  sensors: ZoneSensors,
+  config?: ClimateCommandCenterConfig,
+): 'floor_heat' | 'thermostat' {
+  const override = config?.zone_kinds?.[zone.climate_entity];
+  if (override) return override;
   if (sensors.floor != null) return 'floor_heat';
   const name = normalize(zone.name);
   if (name.includes('thermostat')) return 'thermostat';
@@ -594,7 +601,7 @@ export function buildZones(hass: HomeAssistant, config: ClimateCommandCenterConf
       area,
       area_id,
       floor: zone.floor,
-      kind: zoneKind(hass, zone, sensors),
+      kind: zoneKind(hass, zone, sensors, config),
       sensors,
       roomSensors: [],
       otherSensors: [],

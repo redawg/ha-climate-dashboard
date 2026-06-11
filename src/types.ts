@@ -54,6 +54,8 @@ export interface ClimateCommandCenterConfig {
   /** legacy / alias for exclude_entities in editor */
   sensor_assignments?: SensorAssignment[];
   other_sensor_patterns?: string[];
+  /** climate_entity_id -> 'floor_heat' | 'thermostat' override */
+  zone_kinds?: Record<string, 'floor_heat' | 'thermostat'>;
   /** Floor plan visualization config */
   floor_plan?: FloorPlanConfig;
 }
